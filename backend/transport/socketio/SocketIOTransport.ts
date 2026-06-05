@@ -2,12 +2,12 @@
  * SocketIOTransport - Socket.IO 协议传输层实现
  * 实现 ITransport 接口
  */
-import { Server as SocketIOServer } from 'socket.io';
+import { Server as SocketIOServer, type ServerOptions } from 'socket.io';
 import { createServer as createHttpServer } from 'http';
 import { createServer as createHttpsServer } from 'https';
 import { readFileSync } from 'fs';
 import { nanoid } from 'nanoid';
-import type { ServerConfig, ClientInfo, ProtocolType } from '../../src/types/index';
+import type { ServerConfig, ClientInfo, ProtocolType, HeartbeatConfig } from '../../src/types/index';
 import { BaseTransport } from '../BaseTransport.js';
 
 export class SocketIOTransport extends BaseTransport {
@@ -17,10 +17,12 @@ export class SocketIOTransport extends BaseTransport {
   private clientInfoMap = new Map<string, ClientInfo>();
   private isRunningFlag = false;
   private config!: ServerConfig;
+  private heartbeatConfig?: HeartbeatConfig;
 
-  constructor(config: ServerConfig) {
+  constructor(config: ServerConfig, heartbeatConfig?: HeartbeatConfig) {
     super();
     this.config = config;
+    this.heartbeatConfig = heartbeatConfig;
   }
 
   async start(): Promise<void> {
@@ -29,6 +31,14 @@ export class SocketIOTransport extends BaseTransport {
     return new Promise((resolve, reject) => {
       try {
         const { ip, port, wssEnabled, certPath, keyPath } = this.config;
+        const hb = this.heartbeatConfig;
+
+        let pingInterval: number | undefined;
+        let pingTimeout: number | undefined;
+        if (!hb || hb.enabled !== false) {
+          pingInterval = hb?.pingInterval ?? 30000;
+          pingTimeout = hb?.pongTimeout ?? 90000;
+        }
 
         if (wssEnabled && certPath && keyPath) {
           const options = {
@@ -40,11 +50,13 @@ export class SocketIOTransport extends BaseTransport {
           this.httpServer = createHttpServer();
         }
 
-        this.io = new SocketIOServer(this.httpServer, {
+        const opts: any = {
           cors: { origin: '*', methods: ['GET', 'POST'] },
-          pingInterval: 30000,
-          pingTimeout: 90000,
-        });
+        };
+        if (pingInterval !== undefined) opts.pingInterval = pingInterval;
+        if (pingTimeout !== undefined) opts.pingTimeout = pingTimeout;
+
+        this.io = new SocketIOServer(this.httpServer, opts);
 
         this.io.on('connection', (socket) => {
           const clientId = nanoid(16);

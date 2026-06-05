@@ -140,7 +140,7 @@ export function SettingsPage(): React.ReactElement {
       key: 'heartbeat',
       label: '心跳配置',
       children: (
-        <Form form={form} layout="vertical" style={{ maxWidth: 600, marginTop: 16 }} initialValues={{ heartbeat: { enabled: true, pingInterval: 30000, pongTimeout: 90000 } }}>
+        <Form form={form} layout="vertical" style={{ maxWidth: 600, marginTop: 16 }}>
           <Form.Item 
             name={['heartbeat', 'enabled']} 
             label="启用心跳检测" 
@@ -290,6 +290,7 @@ export function SettingsPage(): React.ReactElement {
         <Tabs 
           items={tabItems} 
           type="card"
+          destroyInactiveTabPane={false}
         />
       </Card>
       

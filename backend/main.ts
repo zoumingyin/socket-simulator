@@ -38,6 +38,8 @@ export class SocketServiceApp extends EventEmitter {
       this.eventManager.registerServerConfig(cfg);
     }
     this.serviceManager.setClientManager(this.clientManager);
+    this.serviceManager.setConfigManager(this.configManager);
+    this.serviceManager.setLogManager(this.logManager);
     this.serviceManager.loadConfig(servers, autoStartIds);
 
     // 4. 监听 ServiceManager 的传输层事件

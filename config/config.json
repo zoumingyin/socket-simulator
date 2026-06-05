@@ -44,7 +44,7 @@
     "id": "system",
     "heartbeat": {
       "enabled": true,
-      "pingInterval": 30000,
+      "pingInterval": 5000,
       "pongTimeout": 90000
     },
     "wss": {
@@ -60,7 +60,7 @@
     "startMinimized": false,
     "logRetentionDays": 7,
     "maxConnectionsPerServer": 1000,
-    "updatedAt": "2026-06-03T14:36:01.776Z"
+    "updatedAt": "2026-06-05T07:52:16.560Z"
   },
   "windowConfig": {
     "width": 1280,
@@ -68,5 +68,5 @@
     "maximized": false
   },
   "version": "1.0.0",
-  "exportedAt": "2026-06-05T06:49:20.075Z"
+  "exportedAt": "2026-06-05T07:52:16.560Z"
 }

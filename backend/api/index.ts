@@ -309,12 +309,41 @@ async function handleRequest(req: IncomingMessage, res: ServerResponse): Promise
       const data = body.data ?? (body.content ? (body.messageType === 'json' ? JSON.parse(body.content) : body.content) : {});
       if (body.targetType === 'broadcast' || !body.targetId) {
         await transport.broadcast(body.event, data);
+        try {
+          app.logManager.addEntry({
+            id: nanoid(),
+            timestamp: new Date().toISOString(),
+            level: 'INFO',
+            event: body.event,
+            serverId: serverId,
+            message: `[消息中心] 广播消息 → 事件: ${body.event}, 内容: ${typeof data === 'string' ? data : JSON.stringify(data)}`,
+            metadata: { targetType: 'broadcast', targetId: undefined, event: body.event, content: typeof data === 'string' ? data : JSON.stringify(data) },
+          });
+          console.log(`[Log] Broadcast log entry added: ${body.event}`);
+        } catch (err) {
+          console.error('[Log] Failed to add broadcast log entry:', err);
+        }
       } else {
         // targetId 格式可能是 "serverId___socketId"，需要提取真正的 socketId
         const socketId = body.targetId.includes('___')
           ? body.targetId.split('___').slice(1).join('___')
           : body.targetId;
         await transport.send(socketId, body.event, data);
+        try {
+          app.logManager.addEntry({
+            id: nanoid(),
+            timestamp: new Date().toISOString(),
+            level: 'INFO',
+            event: body.event,
+            serverId: serverId,
+            clientId: body.targetId,
+            message: `[消息中心] 指定发送 → 客户端: ${body.targetId}, 事件: ${body.event}, 内容: ${typeof data === 'string' ? data : JSON.stringify(data)}`,
+            metadata: { targetType: body.targetType, targetId: body.targetId, event: body.event, content: typeof data === 'string' ? data : JSON.stringify(data) },
+          });
+          console.log(`[Log] Targeted log entry added: ${body.event} -> ${body.targetId}`);
+        } catch (err) {
+          console.error('[Log] Failed to add targeted log entry:', err);
+        }
       }
       return sendJSON(res, 200, { success: true, message: '消息已发送' });
     }
@@ -336,12 +365,41 @@ async function handleRequest(req: IncomingMessage, res: ServerResponse): Promise
       const data = body.content ? (body.messageType === 'json' ? JSON.parse(body.content) : body.content) : {};
       if (body.targetType === 'broadcast') {
         await transport.broadcast(body.event, data);
+        try {
+          app.logManager.addEntry({
+            id: nanoid(),
+            timestamp: new Date().toISOString(),
+            level: 'INFO',
+            event: body.event,
+            serverId: body.serverId,
+            message: `[消息中心] 广播消息 → 事件: ${body.event}, 内容: ${typeof data === 'string' ? data : JSON.stringify(data)}`,
+            metadata: { targetType: 'broadcast', targetId: undefined, event: body.event, content: typeof data === 'string' ? data : JSON.stringify(data) },
+          });
+          console.log(`[Log] Send-message broadcast log entry added: ${body.event}`);
+        } catch (err) {
+          console.error('[Log] Failed to add send-message broadcast log entry:', err);
+        }
       } else if (body.targetId) {
         // targetId 格式可能是 "serverId___socketId"，需要提取真正的 socketId
         const socketId = body.targetId.includes('___')
           ? body.targetId.split('___').slice(1).join('___')
           : body.targetId;
         await transport.send(socketId, body.event, data);
+        try {
+          app.logManager.addEntry({
+            id: nanoid(),
+            timestamp: new Date().toISOString(),
+            level: 'INFO',
+            event: body.event,
+            serverId: body.serverId,
+            clientId: body.targetId,
+            message: `[消息中心] 指定发送 → 客户端: ${body.targetId}, 事件: ${body.event}, 内容: ${typeof data === 'string' ? data : JSON.stringify(data)}`,
+            metadata: { targetType: body.targetType, targetId: body.targetId, event: body.event, content: typeof data === 'string' ? data : JSON.stringify(data) },
+          });
+          console.log(`[Log] Send-message targeted log entry added: ${body.event} -> ${body.targetId}`);
+        } catch (err) {
+          console.error('[Log] Failed to add send-message targeted log entry:', err);
+        }
       }
       return sendJSON(res, 200, { success: true, message: '消息已发送' });
     }

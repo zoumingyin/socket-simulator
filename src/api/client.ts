@@ -8,7 +8,8 @@ async function apiFetch<T = unknown>(
   path: string,
   options: RequestInit = {}
 ): Promise<{ success: boolean; data?: T; error?: string }> {
-  const url = path.startsWith('http') ? path : `${API_BASE}${path}`;
+  const normalizedPath = path.startsWith('/api/') ? path : `/api${path.startsWith('/') ? path : '/' + path}`;
+  const url = path.startsWith('http') ? path : `${API_BASE}${normalizedPath}`;
   try {
     const res = await fetch(url, {
       ...options,

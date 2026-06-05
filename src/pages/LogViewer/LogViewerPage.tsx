@@ -4,7 +4,7 @@
  */
 import React, { useEffect, useState } from 'react';
 import {
-  Card, Input, Select, Space, Button, Switch, Table, Tag, Typography,
+  Card, Input, Select, Space, Button, Switch, Table, Tag, Typography, Popover,
   message,
 } from 'antd';
 import { SearchOutlined, ExportOutlined, ClearOutlined, ReloadOutlined } from '@ant-design/icons';
@@ -70,19 +70,34 @@ export function LogViewerPage(): React.ReactElement {
     { title: '客户端ID', dataIndex: 'clientId', key: 'clientId', align: 'center' as const, ellipsis: true,
       render: (v?: string) => v ? <Text code>{v}</Text> : '-',
     },
-    { title: '消息', dataIndex: 'message', key: 'message', align: 'center' as const, ellipsis: true,
-      render: (text: string, record: LogEntry) => (
-        <div style={{ textAlign: 'left' }}>
-          <div>{text}</div>
-          {record.metadata && (
-            <div style={{ marginTop: 4, fontSize: 12, color: '#666' }}>
-              {record.metadata.event != null && <div>事件: {String(record.metadata.event)}</div>}
-              {record.metadata.targetType != null && <div>目标: {String(record.metadata.targetType)}</div>}
-              {record.metadata.targetId != null && <div>目标ID: {String(record.metadata.targetId)}</div>}
+    { title: '推送事件', key: 'pushEvent', align: 'center' as const, ellipsis: true,
+      render: (_: unknown, record: LogEntry) =>
+        record.metadata?.event ? <Tag color="blue">{String(record.metadata.event)}</Tag> : '-',
+    },
+    { title: '目标类型', key: 'targetType', align: 'center' as const, ellipsis: true,
+      render: (_: unknown, record: LogEntry) =>
+        record.metadata?.targetType ? <Tag color="green">{String(record.metadata.targetType)}</Tag> : '-',
+    },
+    { title: '目标ID', key: 'targetId', align: 'center' as const, ellipsis: true,
+      render: (_: unknown, record: LogEntry) =>
+        record.metadata?.targetId ? <Text code style={{ fontSize: 12 }}>{String(record.metadata.targetId)}</Text> : '-',
+    },
+    { title: '消息', dataIndex: 'message', key: 'message', align: 'left' as const,
+      ellipsis: false,
+      render: (text: string) => {
+        const popoverContent = (
+          <div style={{ maxHeight: 400, overflow: 'auto', whiteSpace: 'pre-wrap', wordBreak: 'break-all', maxWidth: 600 }}>
+            {text}
+          </div>
+        );
+        return (
+          <Popover content={popoverContent} title="完整消息" trigger="hover" placement="topLeft" mouseEnterDelay={0.3}>
+            <div style={{ textAlign: 'left', maxHeight: 60, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', cursor: 'pointer' }}>
+              {text}
             </div>
-          )}
-        </div>
-      ),
+          </Popover>
+        );
+      },
     },
   ];
 

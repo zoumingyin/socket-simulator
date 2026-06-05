@@ -61,28 +61,28 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
   async updateSystemSettings(patch) {
     const next = { ...get().systemSettings, ...patch, updatedAt: new Date().toISOString() };
     set({ systemSettings: next });
-    await apiFetch('/api/settings/system', {
+    await apiFetch('/api/settings', {
       method: 'POST',
-      body: JSON.stringify(next),
+      body: JSON.stringify({ systemSettings: next }),
     });
   },
 
   async updateWindowConfig(patch) {
     const next = { ...get().windowConfig, ...patch };
     set({ windowConfig: next });
-    await apiFetch('/api/settings/window', {
+    await apiFetch('/api/settings', {
       method: 'POST',
-      body: JSON.stringify(next),
+      body: JSON.stringify({ windowConfig: next }),
     });
   },
 
   async exportConfig() {
-    const res = await apiFetch<Record<string, unknown>>('/api/settings/export');
+    const res = await apiFetch<Record<string, unknown>>('/api/export');
     return res.data ?? {};
   },
 
   async importConfig(config) {
-    await apiFetch('/api/settings/import', {
+    await apiFetch('/api/import', {
       method: 'POST',
       body: JSON.stringify(config),
     });

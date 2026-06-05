@@ -14,16 +14,30 @@ import { WebSocketTransport } from '../transport/websocket/WebSocketTransport.js
 import { SocketIOTransport } from '../transport/socketio/SocketIOTransport.js';
 import type { ITransport } from '../src/types/index';
 import type { ClientManager } from './ClientManager';
+import { ConfigManager } from './ConfigManager.js';
+import { LogManager } from './LogManager.js';
 
 export class ServiceManager extends EventEmitter {
   private servers = new Map<string, ServerConfig>();
   private runtimes = new Map<string, ServerRuntime>();
   private transports = new Map<string, ITransport>();
   private clientManager!: ClientManager;
+  private configManager?: ConfigManager;
+  private logManager?: LogManager;
 
   /** 注入 ClientManager，用于连接时注册客户端 */
   setClientManager(cm: ClientManager): void {
     this.clientManager = cm;
+  }
+
+  /** 注入 ConfigManager，用于读取心跳等系统配置 */
+  setConfigManager(cm: ConfigManager): void {
+    this.configManager = cm;
+  }
+
+  /** 注入 LogManager，用于记录客户端消息日志 */
+  setLogManager(lm: LogManager): void {
+    this.logManager = lm;
   }
 
   /** 加载配置并可选自动启动 */
@@ -286,7 +300,8 @@ export class ServiceManager extends EventEmitter {
       return new WebSocketTransport(config);
     }
     if (config.protocol === 'socket.io') {
-      return new SocketIOTransport(config);
+      const hb = this.configManager?.getSystemSettings().heartbeat;
+      return new SocketIOTransport(config, hb);
     }
     throw new Error(`Unsupported protocol: ${config.protocol}`);
   }
@@ -321,10 +336,25 @@ export class ServiceManager extends EventEmitter {
       this.emit('client_disconnect', serverId, clientId);
     });
 
-    transport.on('message', (_clientId: string, _event: string, _data: unknown) => {
+    transport.on('message', (clientId: string, event: string, data: unknown) => {
       this.updateRuntime(serverId, {
         receivedMessages: (this.runtimes.get(serverId)?.receivedMessages ?? 0) + 1,
       });
+      // 记录客户端消息日志
+      if (this.logManager) {
+        const fullClientId = `${serverId}___${clientId}`;
+        const contentStr = typeof data === 'string' ? data : JSON.stringify(data);
+        this.logManager.addEntry({
+          id: nanoid(),
+          timestamp: new Date().toISOString(),
+          level: 'INFO',
+          event,
+          serverId,
+          clientId: fullClientId,
+          message: `[客户端消息] 事件: ${event}, 数据: ${contentStr}`,
+          metadata: { event, content: contentStr },
+        });
+      }
     });
 
     transport.on('error', (err: Error) => {
