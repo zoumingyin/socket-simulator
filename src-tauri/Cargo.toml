@@ -1,0 +1,22 @@
+[package]
+name = "socket-service-manager"
+version = "0.1.0"
+edition = "2021"
+description = "Socket 服务管理平台"
+
+[lib]
+crate-type = ["cdylib", "staticlib"]
+
+[dependencies]
+tauri = { version = "2", features = ["tray-icon", "image-png"] }
+tauri-plugin-shell = { version = "2", features = [] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[features]
+default = ["custom-protocol"]
+custom-protocol = ["tauri/custom-protocol"]
+devtools = ["tauri/devtools"]

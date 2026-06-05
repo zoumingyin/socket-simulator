@@ -1,0 +1,72 @@
+{
+  "servers": [
+    {
+      "name": "测试",
+      "protocol": "websocket",
+      "ip": "127.0.0.1",
+      "port": 1111,
+      "autoStart": true,
+      "logLevel": "INFO",
+      "id": "rYtzBE3MSyRqXvomWcFX8"
+    },
+    {
+      "id": "N_jCYmEZDjtvkcFD4UeoA",
+      "name": "11",
+      "protocol": "websocket",
+      "ip": "127.0.0.1",
+      "port": 3000
+    },
+    {
+      "id": "6OnRqBAwC4R611GDj3z0G",
+      "name": "www",
+      "protocol": "websocket",
+      "ip": "127.0.0.1",
+      "port": 2345,
+      "autoStart": false
+    }
+  ],
+  "events": [
+    {
+      "serverId": "rYtzBE3MSyRqXvomWcFX8",
+      "name": "测试",
+      "status": "enabled",
+      "pollingEnabled": false,
+      "pollingInterval": 3,
+      "defaultMessage": "{\"msg\":\"hello world\"}",
+      "id": "qqnH9eBF4_S6",
+      "createdAt": "2026-06-05T02:12:51.409Z",
+      "updatedAt": "2026-06-05T02:13:41.049Z",
+      "isDefault": false
+    }
+  ],
+  "templates": [],
+  "systemSettings": {
+    "id": "system",
+    "heartbeat": {
+      "enabled": true,
+      "pingInterval": 30000,
+      "pongTimeout": 90000
+    },
+    "wss": {
+      "enabled": false,
+      "certPath": "",
+      "keyPath": ""
+    },
+    "ipAccess": {
+      "whitelist": [],
+      "blacklist": []
+    },
+    "autoStart": false,
+    "startMinimized": false,
+    "logRetentionDays": 7,
+    "maxConnectionsPerServer": 1000,
+    "updatedAt": "2026-06-03T14:36:01.776Z"
+  },
+  "windowConfig": {
+    "width": 1280,
+    "height": 800,
+    "maximized": false
+  },
+  "version": "1.0.0",
+  "exportedAt": "2026-06-05T02:13:41.049Z"
+}
