@@ -49,22 +49,22 @@ export function EventManagerPage(): React.ReactElement {
   };
 
   const columns = [
-    { title: '事件名称', dataIndex: 'name', key: 'name' },
-    { title: '服务ID', dataIndex: 'serverId', key: 'serverId', width: 120 },
-    { title: '描述', dataIndex: 'description', key: 'description', ellipsis: true },
+    { title: '事件名称', dataIndex: 'name', key: 'name', align: 'center' as const, ellipsis: true },
+    { title: '服务ID', dataIndex: 'serverId', key: 'serverId', align: 'center' as const, ellipsis: true },
+    { title: '描述', dataIndex: 'description', key: 'description', align: 'center' as const, ellipsis: true },
     { title: '默认事件', dataIndex: 'isDefault', key: 'isDefault',
+      align: 'center' as const,
       render: (v: boolean) => v ? <Tag color="blue">默认</Tag> : <></>,
-      width: 100,
     },
     { title: '状态', dataIndex: 'status', key: 'status',
+      align: 'center' as const,
       render: (v: string) => <Tag color={v === 'enabled' ? 'success' : 'default'}>{v}</Tag>,
-      width: 100,
     },
     { title: '轮询', dataIndex: 'pollingEnabled', key: 'pollingEnabled',
+      align: 'center' as const,
       render: (v: boolean, r: EventConfig) => v ? <Tag color="blue">{r.pollingInterval}s</Tag> : <></>,
-      width: 100,
     },
-    { title: '操作', key: 'actions', width: 240, render: (_: unknown, r: EventConfig) => (
+    { title: '操作', key: 'actions', align: 'center' as const, render: (_: unknown, r: EventConfig) => (
         <Space>
           {r.status === 'enabled'
             ? <Button size="small" icon={<StopOutlined />} onClick={() => toggleEvent(r.id, 'disabled')}>禁用</Button>
@@ -80,7 +80,7 @@ export function EventManagerPage(): React.ReactElement {
   return (
     <div>
       {contextHolder}
-      <Title level={4} style={{ marginBottom: 16 }}>事件管理</Title>
+      <Title level={4} style={{ marginBottom: 16, fontSize: 18 }}>事件管理</Title>
       <Card variant="outlined">
         <Space style={{ marginBottom: 16 }} wrap>
           <Button type="primary" icon={<PlusOutlined />} onClick={() => { setEditing(null); form.resetFields(); setModalOpen(true); }}>新增事件</Button>
@@ -96,7 +96,7 @@ export function EventManagerPage(): React.ReactElement {
             ))}
           </Select>
         </Space>
-        <Table rowKey="id" columns={columns} dataSource={list} loading={loading} pagination={{ pageSize: 20 }} size="small" />
+        <Table bordered rowKey="id" columns={columns} dataSource={list} loading={loading} pagination={{ pageSize: 15, showSizeChanger: true, showTotal: (total) => `共 ${total} 个事件` }} size="small" scroll={{ x: 'max-content' }} />
       </Card>
 
       <Modal

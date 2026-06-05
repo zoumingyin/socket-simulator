@@ -24,6 +24,10 @@ interface ServerState {
   startAll: () => Promise<void>;
   stopAll: () => Promise<void>;
   restartAll: () => Promise<void>;
+  batchStart: (ids: string[]) => Promise<void>;
+  batchStop: (ids: string[]) => Promise<void>;
+  batchRestart: (ids: string[]) => Promise<void>;
+  batchDelete: (ids: string[]) => Promise<void>;
   setRuntime: (id: string, rt: ServerRuntime) => void;
   setRuntimes: (rts: Record<string, ServerRuntime>) => void;
 }
@@ -124,6 +128,22 @@ export const useServerStore = create<ServerState>((set, get) => ({
   async restartAll() {
     await apiFetch(`/server/restart-all`, { method: 'POST' });
     await get().fetchRuntimes();
+  },
+
+  async batchStart(ids: string[]) {
+    await Promise.all(ids.map(id => get().startServer(id)));
+  },
+
+  async batchStop(ids: string[]) {
+    await Promise.all(ids.map(id => get().stopServer(id)));
+  },
+
+  async batchRestart(ids: string[]) {
+    await Promise.all(ids.map(id => get().restartServer(id)));
+  },
+
+  async batchDelete(ids: string[]) {
+    await Promise.all(ids.map(id => get().removeServer(id)));
   },
 
   setRuntime(id, rt) {

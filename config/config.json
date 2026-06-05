@@ -1,13 +1,13 @@
 {
   "servers": [
     {
+      "id": "rYtzBE3MSyRqXvomWcFX8",
       "name": "测试",
       "protocol": "websocket",
       "ip": "127.0.0.1",
       "port": 1111,
-      "autoStart": true,
-      "logLevel": "INFO",
-      "id": "rYtzBE3MSyRqXvomWcFX8"
+      "autoStart": false,
+      "logLevel": "INFO"
     },
     {
       "id": "N_jCYmEZDjtvkcFD4UeoA",
@@ -35,7 +35,7 @@
       "defaultMessage": "{\"msg\":\"hello world\"}",
       "id": "qqnH9eBF4_S6",
       "createdAt": "2026-06-05T02:12:51.409Z",
-      "updatedAt": "2026-06-05T02:13:41.049Z",
+      "updatedAt": "2026-06-05T06:49:20.020Z",
       "isDefault": false
     }
   ],
@@ -68,5 +68,5 @@
     "maximized": false
   },
   "version": "1.0.0",
-  "exportedAt": "2026-06-05T02:13:41.049Z"
+  "exportedAt": "2026-06-05T06:49:20.075Z"
 }

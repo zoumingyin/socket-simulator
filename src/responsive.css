@@ -1,0 +1,138 @@
+/**
+ * responsive.css - 响应式布局适配
+ * 主要针对 1280×800 分辨率优化
+ */
+
+/* ========== 全局紧凑模式 ========== */
+
+/* 当视窗高度 <= 800px 时，进一步压缩间距 */
+@media (max-height: 800px) {
+  .ant-layout-content {
+    margin: 8px !important;
+    padding: 12px !important;
+  }
+
+  /* 压缩卡片间距 */
+  .ant-card {
+    margin-bottom: 12px !important;
+  }
+
+  .ant-card-body {
+    padding: 12px !important;
+  }
+
+  /* 压缩标题间距 */
+  .ant-typography h4 {
+    margin-bottom: 12px !important;
+    font-size: 16px !important;
+  }
+
+  /* 压缩表格间距 */
+  .ant-table-small .ant-table-thead > tr > th {
+    padding: 6px 4px !important;
+  }
+
+  .ant-table-small .ant-table-tbody > tr > td {
+    padding: 6px 4px !important;
+  }
+
+  /* 压缩筛选栏 */
+  .ant-radio-group-sm .ant-radio-button-wrapper {
+    font-size: 12px !important;
+    height: 24px !important;
+    line-height: 22px !important;
+  }
+
+  /* 压缩按钮 */
+  .ant-btn-sm {
+    font-size: 12px !important;
+    height: 24px !important;
+    padding: 0 8px !important;
+  }
+}
+
+/* 当视窗宽度 <= 1280px 时，调整侧边栏和内容 */
+@media (max-width: 1280px) {
+  /* 侧边栏压缩 */
+  .ant-layout-sider {
+    min-width: 180px !important;
+    max-width: 180px !important;
+    flex: 0 0 180px !important;
+  }
+
+  /* 菜单项压缩 */
+  .ant-menu-inline .ant-menu-item {
+    height: 36px !important;
+    line-height: 36px !important;
+    font-size: 13px !important;
+  }
+
+  /* 统计卡片在窄屏幕上堆叠 */
+  .ant-col-md-6 {
+    flex: 0 0 50% !important;
+    max-width: 50% !important;
+  }
+}
+
+/* ========== 表格自适应优化 ========== */
+
+/* 表格容器滚动优化 */
+.ant-table-wrapper {
+  overflow-x: auto !important;
+}
+
+/* 固定列阴影优化 */
+.ant-table-cell-fix-right {
+  z-index: 2 !important;
+}
+
+/* ========== 设置页面优化 ========== */
+
+/* Tabs 在窄屏幕上的优化 */
+@media (max-width: 1280px) {
+  .ant-tabs-card > .ant-tabs-nav .ant-tabs-tab {
+    padding: 6px 12px !important;
+    font-size: 13px !important;
+  }
+}
+
+/* ========== 日志页面优化 ========== */
+
+/* 日志表格在窄屏幕上的优化 */
+@media (max-height: 800px) {
+  .log-viewer-table .ant-table-tbody > tr > td {
+    padding: 4px 8px !important;
+    font-size: 12px !important;
+  }
+}
+
+/* ========== 滚动条优化 ========== */
+
+/* 自定义滚动条样式（WebKit） */
+::-webkit-scrollbar {
+  width: 6px !important;
+  height: 6px !important;
+}
+
+::-webkit-scrollbar-track {
+  background: #f1f1f1 !important;
+  border-radius: 3px !important;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #c1c1c1 !important;
+  border-radius: 3px !important;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #a1a1a1 !important;
+}
+
+/* ========== 卡片视图优化 ========== */
+
+/* 卡片网格在窄屏幕上的优化 */
+@media (max-width: 1280px) {
+  div[style*="grid-template-columns"] {
+    grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)) !important;
+  }
+}

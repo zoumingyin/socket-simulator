@@ -279,9 +279,9 @@ export function SettingsPage(): React.ReactElement {
   return (
     <div>
       {contextHolder}
-      <div style={{ display: 'flex', alignItems: 'center', marginBottom: 24 }}>
-        <SettingOutlined style={{ fontSize: 24, marginRight: 12, color: '#1677ff' }} />
-        <Title level={4} style={{ margin: 0 }}>系统设置</Title>
+      <div style={{ display: 'flex', alignItems: 'center', marginBottom: 16 }}>
+        <SettingOutlined style={{ fontSize: 20, marginRight: 8, color: '#1677ff' }} />
+        <Title level={4} style={{ margin: 0, fontSize: 18 }}>系统设置</Title>
       </div>
       
       {error && <Paragraph type="danger">{error}</Paragraph>}
@@ -290,7 +290,6 @@ export function SettingsPage(): React.ReactElement {
         <Tabs 
           items={tabItems} 
           type="card"
-          style={{ minHeight: 400 }}
         />
       </Card>
       

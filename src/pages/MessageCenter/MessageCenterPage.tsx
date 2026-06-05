@@ -76,7 +76,7 @@ export function MessageCenterPage(): React.ReactElement {
   return (
     <div>
       {contextHolder}
-      <Title level={4} style={{ marginBottom: 24 }}>消息中心</Title>
+      <Title level={4} style={{ marginBottom: 16, fontSize: 18 }}>消息中心</Title>
 
       <Card title="发送消息" variant="outlined" style={{ marginBottom: 24 }}>
         <Space direction="vertical" style={{ width: '100%' }} size={16}>
