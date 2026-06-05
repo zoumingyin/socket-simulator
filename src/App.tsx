@@ -44,24 +44,44 @@ function AppLayout(): React.ReactElement {
     document.title = 'Socket 服务管理平台';
   }, []);
 
-  const algorithm = themeMode === 'dark' ? theme.darkAlgorithm : theme.defaultAlgorithm;
+  const isDark = themeMode === 'dark';
+  const algorithm = isDark ? theme.darkAlgorithm : theme.defaultAlgorithm;
 
   return (
     <ConfigProvider
       locale={zhCN}
       theme={{
         algorithm,
-        token: { colorPrimary: '#1677ff' },
+        token: {
+          colorPrimary: '#1677ff',
+          colorBgBase: isDark ? '#141414' : '#ffffff',
+          colorTextBase: isDark ? '#ffffff' : '#000000',
+        },
+        components: {
+          Card: {
+            colorBgContainer: isDark ? '#1f1f1f' : '#ffffff',
+          },
+          Table: {
+            colorBgContainer: isDark ? '#1f1f1f' : '#ffffff',
+            headerColor: isDark ? '#ffffff' : '#000000',
+          },
+          Modal: {
+            colorBgElevated: isDark ? '#1f1f1f' : '#ffffff',
+          },
+          Drawer: {
+            colorBgElevated: isDark ? '#1f1f1f' : '#ffffff',
+          },
+        },
       }}
     >
       <Layout style={{ minHeight: '100vh', display: 'flex' }}>
-        <Layout.Sider width={200} theme={themeMode === 'dark' ? 'dark' : 'light'} style={{ height: '100vh', overflow: 'auto' }}>
-          <div style={{ height: 40, display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 12px', borderBottom: '1px solid #f0f0f0' }}>
-            <Typography.Title level={5} style={{ margin: 0, color: themeMode === 'dark' ? '#fff' : '#1677ff', fontSize: 14 }}>
+        <Layout.Sider width={200} theme={isDark ? 'dark' : 'light'} style={{ height: '100vh', overflow: 'auto' }}>
+          <div style={{ height: 40, display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 12px', borderBottom: `1px solid ${isDark ? '#333' : '#f0f0f0'}` }}>
+            <Typography.Title level={5} style={{ margin: 0, color: isDark ? '#fff' : '#1677ff', fontSize: 14 }}>
               Socket 管理平台
             </Typography.Title>
             <Switch
-              checked={themeMode === 'dark'}
+              checked={isDark}
               onChange={toggleTheme}
               checkedChildren={<MoonOutlined style={{ fontSize: 12 }} />}
               unCheckedChildren={<SunOutlined style={{ fontSize: 12 }} />}
@@ -76,8 +96,8 @@ function AppLayout(): React.ReactElement {
             onClick={({ key }) => navigate(key)}
           />
         </Layout.Sider>
-        <Layout style={{ display: 'flex', flexDirection: 'column', height: '100vh', overflow: 'hidden', background: themeMode === 'dark' ? '#141414' : '#f5f5f5' }}>
-          <Layout.Content style={{ margin: 12, flex: 1, overflow: 'auto', background: themeMode === 'dark' ? '#141414' : '#fff', borderRadius: 8, padding: 16 }}>
+        <Layout style={{ display: 'flex', flexDirection: 'column', height: '100vh', overflow: 'hidden', background: isDark ? '#0a0a0a' : '#f5f5f5' }}>
+          <Layout.Content style={{ margin: 12, flex: 1, overflow: 'auto', background: isDark ? '#141414' : '#fff', borderRadius: 8, padding: 16 }}>
             <Routes>
               <Route path="/" element={<DashboardPage />} />
               <Route path="/servers" element={<ServerManagerPage />} />

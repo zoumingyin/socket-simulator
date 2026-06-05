@@ -291,11 +291,13 @@ export function DashboardPage(): React.ReactElement {
       {/* 快速操作提示 */}
       <Card
         title="快速操作"
-        variant="outlined"
         style={{ ...cardStyle, marginTop: 12 }}
       >
-        <Paragraph type="secondary">💡 提示：</Paragraph>
-        <ul>
+        <div style={{ display: 'flex', alignItems: 'center', marginBottom: 8 }}>
+          <span style={{ fontSize: 16, marginRight: 6 }}>💡</span>
+          <Text type="secondary">提示：</Text>
+        </div>
+        <ul style={{ margin: 0, paddingLeft: 20, lineHeight: 1.8 }}>
           <li>点击左侧菜单可快速切换功能页面</li>
           <li>在服务管理页面可以新增、启动、停止服务</li>
           <li>在客户端管理页面可以查看连接的客户端并发送消息</li>
