@@ -5,10 +5,10 @@
 import React, { useEffect, useState } from 'react';
 import {
   Card, Table, Tag, Space, Button, Input, Modal, Form, message, Popconfirm, Typography, Spin,
-  Select, Tooltip, Badge, Radio, Empty, Avatar,
+  Select, Tooltip, Badge, Radio,
 } from 'antd';
-import { SearchOutlined, SendOutlined, DisconnectOutlined, TeamOutlined, GroupOutlined } from '@ant-design/icons';
-import type { ClientInfo, ClientGroup } from '../../types/index.js';
+import { SearchOutlined, SendOutlined, DisconnectOutlined, TeamOutlined } from '@ant-design/icons';
+import type { ClientInfo } from '../../types/index.js';
 import { useClientStore } from '../../store/useClientStore.js';
 
 const { Title, Text, Paragraph } = Typography;
@@ -17,7 +17,7 @@ const { Option } = Select;
 type ViewMode = 'table' | 'grouped';
 
 export function ClientManagerPage(): React.ReactElement {
-  const { list, groups, loading, fetchClients, fetchGroups, sendMessage, disconnectClient } = useClientStore();
+  const { list, loading, fetchClients, sendMessage, disconnectClient } = useClientStore();
   const [messageApi, contextHolder] = message.useMessage();
   
   const [keyword, setKeyword] = useState('');
@@ -29,7 +29,7 @@ export function ClientManagerPage(): React.ReactElement {
   const [sendForm] = Form.useForm();
   const [sending, setSending] = useState(false);
   
-  const [viewMode, setViewMode] = useState<ViewMode>('table');
+  const [viewMode] = useState<ViewMode>('table');
 
   useEffect(() => { fetchClients(); }, []);
 
@@ -133,14 +133,6 @@ export function ClientManagerPage(): React.ReactElement {
       render: (v: string) => <Tag color={v === 'websocket' ? 'blue' : 'green'}>{v.toUpperCase()}</Tag>,
     },
     {
-      title: '分组',
-      dataIndex: 'group',
-      key: 'group',
-      align: 'center' as const,
-      ellipsis: true,
-      render: (v: string) => v ? <Tag>{v}</Tag> : '-',
-    },
-    {
       title: '连接时间',
       dataIndex: 'connectedAt',
       key: 'connectedAt',
@@ -198,13 +190,11 @@ export function ClientManagerPage(): React.ReactElement {
           <Tooltip title="视图切换">
             <Radio.Group
               value={viewMode}
-              onChange={(e) => setViewMode(e.target.value)}
               size="small"
               optionType="button"
               buttonStyle="solid"
             >
               <Radio.Button value="table"><TeamOutlined /> 列表</Radio.Button>
-              <Radio.Button value="grouped"><GroupOutlined /> 分组</Radio.Button>
             </Radio.Group>
           </Tooltip>
         </Space>
@@ -260,86 +250,18 @@ export function ClientManagerPage(): React.ReactElement {
       </div>
 
       {/* 内容区域 */}
-      {viewMode === 'table' ? (
-        <Card variant="outlined">
-          <Table
-            bordered
-            rowKey="id"
-            columns={columns}
-            dataSource={filtered}
-            loading={loading}
-            pagination={{ pageSize: 15, showSizeChanger: true, showTotal: (total) => `共 ${total} 个客户端` }}
-            size="small"
-            scroll={{ x: 'max-content' }}
-          />
-        </Card>
-      ) : (
-        <div>
-          {Object.keys(groupedByServer).length === 0 ? (
-            <Empty description="暂无客户端连接" />
-          ) : (
-            Object.entries(groupedByServer).map(([serverId, clients]) => (
-              <Card
-                key={serverId}
-                title={
-                  <div style={{ display: 'flex', alignItems: 'center' }}>
-                    <Avatar icon={<TeamOutlined />} style={{ backgroundColor: '#1677ff', marginRight: 8 }} size="small" />
-                    <Text strong>{serverId}</Text>
-                    <Badge 
-                      count={clients.filter(c => c.status === 'connected').length} 
-                      style={{ marginLeft: 8 }}
-                      title="在线客户端数"
-                    />
-                  </div>
-                }
-                style={{ marginBottom: 16 }}
-                size="small"
-              >
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(250px, 1fr))', gap: 8 }}>
-                  {clients.map(client => (
-                    <Card
-                      key={client.id}
-                      size="small"
-                      hoverable
-                      style={{ 
-                        borderLeft: `3px solid ${client.status === 'connected' ? '#52c41a' : '#d9d9d9'}`,
-                        padding: 8
-                      }}
-                    >
-                      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
-                        <Text strong><Tag color={client.protocol === 'websocket' ? 'blue' : 'green'}>{client.protocol}</Tag></Text>
-                        <Badge status={client.status === 'connected' ? 'success' : 'default'} />
-                      </div>
-                      <div style={{ fontSize: 12, color: '#666', marginBottom: 4 }}>
-                        <div>IP: {client.ipAddress}</div>
-                        <div>连接: {formatTime(client.connectedAt)}</div>
-                      </div>
-                      <Space size="small">
-                        <Tooltip title="发送消息">
-                          <Button 
-                            size="small" 
-                            icon={<SendOutlined />} 
-                            onClick={() => {
-                              setSendingTo(client);
-                              setSendModalOpen(true);
-                            }}
-                            disabled={client.status !== 'connected'}
-                          />
-                        </Tooltip>
-                        <Popconfirm title="确认断开？" onConfirm={() => disconnectClient(client.serverId, client.id)}>
-                          <Tooltip title="断开连接">
-                            <Button size="small" danger icon={<DisconnectOutlined />} />
-                          </Tooltip>
-                        </Popconfirm>
-                      </Space>
-                    </Card>
-                  ))}
-                </div>
-              </Card>
-            ))
-          )}
-        </div>
-      )}
+      <Card variant="outlined">
+        <Table
+          bordered
+          rowKey="id"
+          columns={columns}
+          dataSource={filtered}
+          loading={loading}
+          pagination={{ pageSize: 15, showSizeChanger: true, showTotal: (total) => `共 ${total} 个客户端` }}
+          size="small"
+          scroll={{ x: 'max-content' }}
+        />
+      </Card>
 
       {/* 发送消息弹窗 */}
       <Modal

@@ -5,18 +5,16 @@
  */
 
 import { create } from 'zustand';
-import type { ClientInfo, SendMessageRequest, ClientGroup } from '../types/index';
+import type { ClientInfo, SendMessageRequest } from '../types/index';
 import { apiFetch } from '../api/client';
 import { adminSocket } from '../socket/AdminSocketManager';
 
 interface ClientState {
   list: ClientInfo[];
-  groups: ClientGroup[];
   loading: boolean;
   error?: string;
 
   fetchClients: (serverId?: string) => Promise<void>;
-  fetchGroups: () => Promise<void>;
   sendMessage: (req: SendMessageRequest) => Promise<void>;
   broadcast: (req: SendMessageRequest) => Promise<void>;
   disconnectClient: (serverId: string, clientId: string) => Promise<void>;
@@ -37,7 +35,6 @@ function subscribeClientUpdates(): void {
 
 export const useClientStore = create<ClientState>((set, get) => ({
   list: [],
-  groups: [],
   loading: false,
   error: undefined,
 
@@ -51,16 +48,6 @@ export const useClientStore = create<ClientState>((set, get) => ({
       set({ list: res.data ?? [], loading: false });
     } catch (e) {
       set({ error: (e as Error).message, loading: false });
-    }
-  },
-
-  async fetchGroups() {
-    // 后端暂未实现 client-groups API，静默处理
-    try {
-      const res = await apiFetch<ClientGroup[]>('/api/client-groups');
-      set({ groups: res.data ?? [] });
-    } catch {
-      set({ groups: [] });
     }
   },
 

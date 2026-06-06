@@ -91,9 +91,6 @@ export interface SocketIOEventData {
 /** 客户端连接状态 */
 export type ClientStatus = 'connected' | 'disconnected';
 
-/** 客户端分组类型 */
-export type ClientGroupType = 'device' | 'user' | 'webpage' | 'custom';
-
 /** 客户端信息 */
 export interface ClientInfo {
   id: string;
@@ -104,18 +101,7 @@ export interface ClientInfo {
   lastActivityAt: string;
   protocol: ProtocolType;
   status: ClientStatus;
-  group?: ClientGroupType;
-  groupName?: string;
   metadata?: Record<string, unknown>;
-}
-
-/** 客户端分组 */
-export interface ClientGroup {
-  id: string;
-  name: string;
-  type: ClientGroupType;
-  clientIds: string[];
-  createdAt: string;
 }
 
 // ======================== 消息中心 ========================
@@ -124,7 +110,7 @@ export interface ClientGroup {
 export type MessageType = 'text' | 'json';
 
 /** 消息目标类型 */
-export type MessageTargetType = 'broadcast' | 'client' | 'group';
+export type MessageTargetType = 'broadcast' | 'client';
 
 /** 发送消息请求 */
 export interface SendMessageRequest {
@@ -137,18 +123,6 @@ export interface SendMessageRequest {
   metadata?: Record<string, unknown>;
 }
 
-/** 消息模板 */
-export interface MessageTemplate {
-  id: string;
-  name: string;
-  description?: string;
-  event: string;
-  messageType: MessageType;
-  content: string;
-  isDefault: boolean;
-  createdAt: string;
-  updatedAt: string;
-}
 
 // ======================== 日志系统 ========================
 
@@ -277,7 +251,9 @@ export interface ApiResponse<T = unknown> {
   success: boolean;
   data?: T;
   error?: string;
+  errorCode?: string;
   message?: string;
+  timestamp: string;
 }
 
 /** 分页请求 */
@@ -342,7 +318,6 @@ export interface ITransport {
 export interface PersistedConfig {
   servers: ServerConfig[];
   events: EventConfig[];
-  templates: MessageTemplate[];
   systemSettings: SystemSettings;
   windowConfig: WindowConfig;
   version: string;
@@ -371,7 +346,6 @@ export interface ServerState {
 
 export interface ClientState {
   list: ClientInfo[];
-  groups: ClientGroup[];
   loading: boolean;
   error?: string;
 }
@@ -383,7 +357,6 @@ export interface EventState {
 }
 
 export interface MessageState {
-  templates: MessageTemplate[];
   sending: boolean;
   error?: string;
 }

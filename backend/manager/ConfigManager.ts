@@ -8,7 +8,6 @@ import path from 'path';
 import type {
   ServerConfig,
   EventConfig,
-  MessageTemplate,
   SystemSettings,
   WindowConfig,
   PersistedConfig,
@@ -26,7 +25,6 @@ export class ConfigManager {
     return {
       servers: [],
       events: [],
-      templates: [],
       systemSettings: this.getDefaultSystemSettings(),
       windowConfig: this.getDefaultWindowConfig(),
       version: '1.0.0',
@@ -52,15 +50,54 @@ export class ConfigManager {
     return { width: 1280, height: 800, maximized: false };
   }
 
-  /** 读取 config.json，不存在则返回默认数据 */
+  /** 读取 config.json，不存在则返回默认数据（含数据修正） */
   private readData(): DBData {
     try {
       if (!fs.existsSync(configFile)) return this.getDefaultData();
       const raw = fs.readFileSync(configFile, 'utf-8');
-      return JSON.parse(raw) as DBData;
+      const parsed = JSON.parse(raw) as DBData;
+      return this.sanitizeData(parsed);
     } catch {
       return this.getDefaultData();
     }
+  }
+
+  /** 防御性修正：防止旧数据中越界/异常值污染运行时 */
+  private sanitizeData(data: DBData): DBData {
+    if (!data.systemSettings) return data;
+
+    const s = data.systemSettings;
+    const defaults = this.getDefaultSystemSettings();
+
+    // 心跳参数合法范围
+    if (s.heartbeat) {
+      s.heartbeat.pingInterval = this.clamp(
+        Number(s.heartbeat.pingInterval) || defaults.heartbeat.pingInterval,
+        5000, 300000,
+      );
+      s.heartbeat.pongTimeout = this.clamp(
+        Number(s.heartbeat.pongTimeout) || defaults.heartbeat.pongTimeout,
+        10000, 600000,
+      );
+    }
+
+    // 日志保留天数
+    s.logRetentionDays = this.clamp(
+      Number(s.logRetentionDays) || defaults.logRetentionDays,
+      1, 365,
+    );
+
+    // 最大连接数
+    s.maxConnectionsPerServer = this.clamp(
+      Number(s.maxConnectionsPerServer) || defaults.maxConnectionsPerServer,
+      1, 10000,
+    );
+
+    return data;
+  }
+
+  private clamp(value: number, min: number, max: number): number {
+    return Math.max(min, Math.min(max, value));
   }
 
   /** 写入 config.json */
@@ -109,19 +146,6 @@ export class ConfigManager {
     this.writeData(data);
   }
 
-  // ==================== MessageTemplate ====================
-
-  getTemplates(): MessageTemplate[] {
-    return this.readData().templates ?? [];
-  }
-
-  saveTemplates(templates: MessageTemplate[]): void {
-    const data = this.readData();
-    data.templates = templates;
-    data.exportedAt = new Date().toISOString();
-    this.writeData(data);
-  }
-
   // ==================== SystemSettings ====================
 
   getSystemSettings(): SystemSettings {
@@ -130,7 +154,31 @@ export class ConfigManager {
 
   saveSystemSettings(settings: SystemSettings): void {
     const data = this.readData();
-    data.systemSettings = { ...settings, updatedAt: new Date().toISOString() };
+    const defaults = this.getDefaultSystemSettings();
+    // 确保数值字段为 number 类型且在合法范围内
+    data.systemSettings = {
+      ...settings,
+      heartbeat: settings.heartbeat ? {
+        enabled: settings.heartbeat.enabled,
+        pingInterval: this.clamp(
+          Number(settings.heartbeat.pingInterval) || defaults.heartbeat.pingInterval,
+          5000, 300000,
+        ),
+        pongTimeout: this.clamp(
+          Number(settings.heartbeat.pongTimeout) || defaults.heartbeat.pongTimeout,
+          10000, 600000,
+        ),
+      } : settings.heartbeat,
+      logRetentionDays: this.clamp(
+        Number(settings.logRetentionDays) || defaults.logRetentionDays,
+        1, 365,
+      ),
+      maxConnectionsPerServer: this.clamp(
+        Number(settings.maxConnectionsPerServer) || defaults.maxConnectionsPerServer,
+        1, 10000,
+      ),
+      updatedAt: new Date().toISOString(),
+    };
     data.exportedAt = new Date().toISOString();
     this.writeData(data);
   }
@@ -155,7 +203,6 @@ export class ConfigManager {
     return {
       servers: data.servers,
       events: data.events,
-      templates: data.templates,
       systemSettings: data.systemSettings,
       windowConfig: data.windowConfig,
       version: data.version,
@@ -167,7 +214,6 @@ export class ConfigManager {
     const data = this.readData();
     data.servers = config.servers;
     data.events = config.events;
-    data.templates = config.templates;
     data.systemSettings = config.systemSettings;
     data.windowConfig = config.windowConfig;
     data.version = config.version;

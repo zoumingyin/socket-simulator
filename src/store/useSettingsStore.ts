@@ -46,34 +46,72 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
     set({ loading: true, error: undefined });
     try {
       const res = await apiFetch<{ systemSettings: SystemSettings; windowConfig: WindowConfig }>('/api/settings');
-      if (res.data) {
-        set({
-          systemSettings: res.data.systemSettings ?? defaultSystemSettings,
-          windowConfig: res.data.windowConfig ?? defaultWindowConfig,
-          loading: false,
-        });
+      if (!res.success) {
+        const errMsg = res.error || '加载设置失败';
+        set({ loading: false, error: errMsg });
+        console.error('[SettingsStore] fetchSettings 失败:', errMsg);
+        return;
       }
+      set({
+        systemSettings: res.data?.systemSettings ?? defaultSystemSettings,
+        windowConfig: res.data?.windowConfig ?? defaultWindowConfig,
+        loading: false,
+      });
     } catch (e) {
-      set({ error: (e as Error).message, loading: false });
+      const errMsg = (e as Error).message;
+      set({ error: errMsg, loading: false });
+      console.error('[SettingsStore] fetchSettings 异常:', errMsg);
     }
   },
 
   async updateSystemSettings(patch) {
-    const next = { ...get().systemSettings, ...patch, updatedAt: new Date().toISOString() };
-    set({ systemSettings: next });
-    await apiFetch('/api/settings', {
-      method: 'POST',
-      body: JSON.stringify({ systemSettings: next }),
-    });
+    const prev = get().systemSettings;
+    const next = { ...prev, ...patch, updatedAt: new Date().toISOString() };
+    // 乐观更新
+    set({ systemSettings: next, loading: true, error: undefined });
+    try {
+      const res = await apiFetch('/api/settings', {
+        method: 'POST',
+        body: JSON.stringify({ systemSettings: next }),
+      });
+      if (!res.success) {
+        // 回滚
+        set({ systemSettings: prev, loading: false, error: res.error || '保存失败' });
+        throw new Error(res.error || '保存设置失败');
+      }
+      // 保存成功后重新拉取验证
+      await get().fetchSettings();
+    } catch (e) {
+      if (!(e instanceof Error && e.message === '保存设置失败')) {
+        // 网络错误等，回滚乐观更新
+        set({ systemSettings: prev, loading: false, error: (e as Error).message });
+      }
+      throw e;
+    }
+    set({ loading: false });
   },
 
   async updateWindowConfig(patch) {
-    const next = { ...get().windowConfig, ...patch };
-    set({ windowConfig: next });
-    await apiFetch('/api/settings', {
-      method: 'POST',
-      body: JSON.stringify({ windowConfig: next }),
-    });
+    const prev = get().windowConfig;
+    const next = { ...prev, ...patch };
+    set({ windowConfig: next, loading: true, error: undefined });
+    try {
+      const res = await apiFetch('/api/settings', {
+        method: 'POST',
+        body: JSON.stringify({ windowConfig: next }),
+      });
+      if (!res.success) {
+        set({ windowConfig: prev, loading: false, error: res.error || '保存失败' });
+        throw new Error(res.error || '保存窗口配置失败');
+      }
+      await get().fetchSettings();
+    } catch (e) {
+      if (!(e instanceof Error && e.message === '保存窗口配置失败')) {
+        set({ windowConfig: prev, loading: false, error: (e as Error).message });
+      }
+      throw e;
+    }
+    set({ loading: false });
   },
 
   async exportConfig() {

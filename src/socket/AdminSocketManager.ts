@@ -36,8 +36,8 @@ type StateListener = (state: ConnectionState) => void;
 
 // ==================== 配置常量 ====================
 
-const ADMIN_URL = 'http://localhost:3080';
-const ADMIN_PATH = '/admin/socket.io';
+const ADMIN_URL = import.meta.env.VITE_API_BASE || 'http://localhost:3080';
+const ADMIN_PATH = import.meta.env.VITE_ADMIN_SOCKET_PATH || '/admin/socket.io';
 
 /** 指数退避重连参数（Socket.IO 内置） */
 const RECONNECT_DELAY_MIN = 1000;    // 初始 1 秒

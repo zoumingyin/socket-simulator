@@ -2,7 +2,7 @@
  * api/client.ts - 前端 API 调用层
  * 封装所有 REST API 调用，自动拼接 base URL
  */
-const API_BASE = 'http://localhost:3080';
+const API_BASE = import.meta.env.VITE_API_BASE || 'http://localhost:3080';
 
 async function apiFetch<T = unknown>(
   path: string,

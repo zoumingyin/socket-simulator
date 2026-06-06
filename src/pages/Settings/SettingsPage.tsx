@@ -2,7 +2,7 @@
  * SettingsPage - 系统设置页面（优化版）
  * 使用 Tabs 组织设置项，提升用户体验
  */
-import React, { useEffect } from 'react';
+import React, { useEffect, useLayoutEffect, useMemo } from 'react';
 import {
   Tabs, Form, Input, InputNumber, Switch, Button, Space,
   Typography, Upload, message, Card, Divider,
@@ -24,19 +24,49 @@ export function SettingsPage(): React.ReactElement {
   const [windowForm] = Form.useForm();
 
   useEffect(() => {
-    fetchSettings();
+    let cancelled = false;
+    let retryTimer: ReturnType<typeof setTimeout>;
+
+    const loadWithRetry = async (retry = 0) => {
+      await fetchSettings();
+      if (cancelled) return;
+      // 如果加载失败且还有重试次数（处理后端启动延迟的竞态条件）
+      const state = useSettingsStore.getState();
+      if (state.error && retry < 3) {
+        retryTimer = setTimeout(() => loadWithRetry(retry + 1), 2000);
+      }
+    };
+
+    loadWithRetry();
+    return () => {
+      cancelled = true;
+      clearTimeout(retryTimer);
+    };
   }, []);
 
-  useEffect(() => {
+  // 使用 useLayoutEffect 在浏览器绘制前同步回填表单，消除默认值闪烁
+  useLayoutEffect(() => {
     if (systemSettings) {
       form.setFieldsValue({
-        heartbeat: systemSettings.heartbeat,
+        heartbeat: {
+          enabled: systemSettings.heartbeat.enabled,
+          pingInterval: Number(systemSettings.heartbeat.pingInterval),
+          pongTimeout: Number(systemSettings.heartbeat.pongTimeout),
+        },
         wss: systemSettings.wss,
-        ipAccess: systemSettings.ipAccess,
+        // IP 名单：后端存的是 string[]，TextArea 需要字符串
+        ipAccess: {
+          whitelist: Array.isArray(systemSettings.ipAccess.whitelist)
+            ? systemSettings.ipAccess.whitelist.join('\n')
+            : systemSettings.ipAccess.whitelist,
+          blacklist: Array.isArray(systemSettings.ipAccess.blacklist)
+            ? systemSettings.ipAccess.blacklist.join('\n')
+            : systemSettings.ipAccess.blacklist,
+        },
         autoStart: systemSettings.autoStart,
         startMinimized: systemSettings.startMinimized,
-        logRetentionDays: systemSettings.logRetentionDays,
-        maxConnectionsPerServer: systemSettings.maxConnectionsPerServer,
+        logRetentionDays: Number(systemSettings.logRetentionDays),
+        maxConnectionsPerServer: Number(systemSettings.maxConnectionsPerServer),
       });
     }
     if (windowConfig) {
@@ -47,20 +77,55 @@ export function SettingsPage(): React.ReactElement {
   const handleSave = async () => {
     try {
       const vals = await form.validateFields();
-      await updateSystemSettings(vals);
+      // 数值字段确保存储为 number
+      const normalized = {
+        ...vals,
+        heartbeat: vals.heartbeat ? {
+          enabled: vals.heartbeat.enabled,
+          pingInterval: Number(vals.heartbeat.pingInterval),
+          pongTimeout: Number(vals.heartbeat.pongTimeout),
+        } : vals.heartbeat,
+        logRetentionDays: Number(vals.logRetentionDays),
+        maxConnectionsPerServer: Number(vals.maxConnectionsPerServer),
+        // IP 名单：TextArea 产出字符串，拆分为 string[]
+        ipAccess: vals.ipAccess ? {
+          whitelist: typeof vals.ipAccess.whitelist === 'string'
+            ? vals.ipAccess.whitelist.split('\n').map((s: string) => s.trim()).filter(Boolean)
+            : vals.ipAccess.whitelist,
+          blacklist: typeof vals.ipAccess.blacklist === 'string'
+            ? vals.ipAccess.blacklist.split('\n').map((s: string) => s.trim()).filter(Boolean)
+            : vals.ipAccess.blacklist,
+        } : vals.ipAccess,
+      };
+      await updateSystemSettings(normalized);
       messageApi.success('系统设置已保存');
-    } catch (err) {
-      messageApi.error('请检查表单输入');
+    } catch (err: unknown) {
+      // 区分表单验证错误和 API 错误
+      if (err && typeof err === 'object' && 'errorFields' in err) {
+        messageApi.error('请检查表单输入');
+      } else {
+        const msg = err instanceof Error ? err.message : '保存失败，请检查网络连接或后端服务是否正常';
+        messageApi.error(msg);
+      }
     }
   };
 
   const handleWindowSave = async () => {
     try {
       const vals = await windowForm.validateFields();
-      await updateWindowConfig(vals);
+      await updateWindowConfig({
+        width: Number(vals.width),
+        height: Number(vals.height),
+        maximized: vals.maximized,
+      });
       messageApi.success('窗口配置已保存');
-    } catch (err) {
-      messageApi.error('请检查表单输入');
+    } catch (err: unknown) {
+      if (err && typeof err === 'object' && 'errorFields' in err) {
+        messageApi.error('请检查表单输入');
+      } else {
+        const msg = err instanceof Error ? err.message : '保存失败，请检查网络连接或后端服务是否正常';
+        messageApi.error(msg);
+      }
     }
   };
 
@@ -120,11 +185,11 @@ export function SettingsPage(): React.ReactElement {
           </Form.Item>
           <Form.Item 
             name="logRetentionDays" 
-            label="日志保留天数"
+            label="日志保留天数（天）"
             rules={[{ required: true, message: '请输入日志保留天数' }]}
             tooltip="超过保留天数的日志将被自动清理"
           >
-            <Space><InputNumber min={1} max={365} style={{ width: 100 }} /><span>天</span></Space>
+            <InputNumber min={1} max={365} style={{ width: 120 }} />
           </Form.Item>
           <Form.Item 
             name="maxConnectionsPerServer" 
@@ -153,19 +218,19 @@ export function SettingsPage(): React.ReactElement {
           </Form.Item>
           <Form.Item 
             name={['heartbeat', 'pingInterval']} 
-            label="Ping 间隔"
+            label="Ping 间隔（ms）"
             rules={[{ required: true, message: '请输入 Ping 间隔' }]}
             tooltip="向客户端发送心跳包的间隔时间"
           >
-            <Space><InputNumber min={5000} max={300000} style={{ width: 200 }} /><span>ms</span></Space>
+            <InputNumber min={5000} max={300000} style={{ width: 200 }} />
           </Form.Item>
           <Form.Item 
             name={['heartbeat', 'pongTimeout']} 
-            label="Pong 超时"
+            label="Pong 超时（ms）"
             rules={[{ required: true, message: '请输入 Pong 超时' }]}
             tooltip="等待客户端响应心跳的超时时间，超过此时间将断开连接"
           >
-            <Space><InputNumber min={10000} max={600000} style={{ width: 200 }} /><span>ms</span></Space>
+            <InputNumber min={10000} max={600000} style={{ width: 200 }} />
           </Form.Item>
         </Form>
       ),
@@ -232,17 +297,17 @@ export function SettingsPage(): React.ReactElement {
         <Form form={windowForm} layout="vertical" style={{ maxWidth: 600, marginTop: 16 }}>
           <Form.Item 
             name="width" 
-            label="窗口宽度"
+            label="窗口宽度（px）"
             rules={[{ required: true, message: '请输入窗口宽度' }]}
           >
-            <Space><InputNumber min={800} max={3840} style={{ width: 180 }} /><span>px</span></Space>
+            <InputNumber min={800} max={3840} style={{ width: 180 }} />
           </Form.Item>
           <Form.Item 
             name="height" 
-            label="窗口高度"
+            label="窗口高度（px）"
             rules={[{ required: true, message: '请输入窗口高度' }]}
           >
-            <Space><InputNumber min={600} max={2160} style={{ width: 180 }} /><span>px</span></Space>
+            <InputNumber min={600} max={2160} style={{ width: 180 }} />
           </Form.Item>
           <Form.Item 
             name="maximized" 

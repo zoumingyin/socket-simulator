@@ -10,8 +10,6 @@ import type {
   ServerRuntime,
   EventConfig,
   ClientInfo,
-  ClientGroup,
-  MessageTemplate,
   SendMessageRequest,
   LogFilter,
   LogEntry,
@@ -25,7 +23,8 @@ import type {
 import { getApp } from '../main.js';
 import { Server as SocketIOServer, type Socket as ServerSocket } from 'socket.io';
 
-const PORT = 3080;
+const PORT = parseInt(process.env.API_PORT ?? '', 10) || 3080;
+const ALLOWED_ORIGIN = process.env.ALLOWED_ORIGIN || 'http://localhost:5173';
 
 // ==================== 工具函数 ====================
 
@@ -42,18 +41,82 @@ function readBody<T>(req: IncomingMessage): Promise<T> {
 }
 
 function sendJSON(res: ServerResponse, status: number, data: unknown): void {
+  const body = { timestamp: new Date().toISOString(), ...(data as Record<string, unknown>) };
   res.writeHead(status, {
     'Content-Type': 'application/json; charset=utf-8',
-    'Access-Control-Allow-Origin': '*',
+    'Access-Control-Allow-Origin': ALLOWED_ORIGIN,
     'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
     'Access-Control-Allow-Headers': 'Content-Type',
   });
-  res.end(JSON.stringify(data));
+  res.end(JSON.stringify(body));
+}
+
+/** 统一错误响应 */
+function sendError(res: ServerResponse, status: number, errorCode: string, error: string): void {
+  sendJSON(res, status, { success: false, errorCode, error });
 }
 
 function getQueryParams(req: IncomingMessage): Record<string, string> {
   const parsed = parse(req.url ?? '', true);
   return (parsed.query as Record<string, string>) ?? {};
+}
+
+interface MessageTransport {
+  broadcast(event: string, data: unknown): Promise<void>;
+  send(socketId: string, event: string, data: unknown): Promise<void>;
+}
+
+/** 发送消息并记录日志 —— 消除 POST /api/client/send 与 /api/send-message 的重复逻辑 */
+async function sendMessageAndLog(
+  app: Awaited<ReturnType<typeof getApp>>,
+  transport: MessageTransport,
+  params: {
+    serverId: string;
+    targetType: 'broadcast' | 'client';
+    targetId?: string;
+    event: string;
+    data: unknown;
+  },
+): Promise<void> {
+  const contentStr = typeof params.data === 'string' ? params.data : JSON.stringify(params.data);
+
+  if (params.targetType === 'broadcast' || !params.targetId) {
+    await transport.broadcast(params.event, params.data);
+    app.serviceManager.incrementSentMessages(params.serverId);
+    try {
+      app.logManager.addEntry({
+        id: nanoid(),
+        timestamp: new Date().toISOString(),
+        level: 'INFO',
+        event: params.event,
+        serverId: params.serverId,
+        message: `[消息中心] 广播消息 → 事件: ${params.event}, 内容: ${contentStr}`,
+        metadata: { targetType: 'broadcast', targetId: undefined, event: params.event, content: contentStr },
+      });
+    } catch (err) {
+      console.error('[Log] Failed to add broadcast log entry:', err);
+    }
+  } else {
+    const socketId = params.targetId.includes('___')
+      ? params.targetId.split('___').slice(1).join('___')
+      : params.targetId;
+    await transport.send(socketId, params.event, params.data);
+    app.serviceManager.incrementSentMessages(params.serverId);
+    try {
+      app.logManager.addEntry({
+        id: nanoid(),
+        timestamp: new Date().toISOString(),
+        level: 'INFO',
+        event: params.event,
+        serverId: params.serverId,
+        clientId: params.targetId,
+        message: `[消息中心] 指定发送 → 客户端: ${params.targetId}, 事件: ${params.event}, 内容: ${contentStr}`,
+        metadata: { targetType: params.targetType, targetId: params.targetId, event: params.event, content: contentStr },
+      });
+    } catch (err) {
+      console.error('[Log] Failed to add targeted log entry:', err);
+    }
+  }
 }
 
 // ==================== 路由处理 ====================
@@ -62,7 +125,7 @@ async function handleRequest(req: IncomingMessage, res: ServerResponse): Promise
   // CORS preflight
   if (req.method === 'OPTIONS') {
     res.writeHead(204, {
-      'Access-Control-Allow-Origin': '*',
+      'Access-Control-Allow-Origin': ALLOWED_ORIGIN,
       'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
       'Access-Control-Allow-Headers': 'Content-Type',
     });
@@ -134,7 +197,7 @@ async function handleRequest(req: IncomingMessage, res: ServerResponse): Promise
       // 持久化到 ConfigManager
       const servers = app.configManager.getServers();
       const idx = servers.findIndex(s => s.id === body.id);
-      if (idx === -1) return sendJSON(res, 404, { success: false, error: '服务不存在' });
+      if (idx === -1) return sendError(res, 404, 'SERVER_NOT_FOUND', '服务不存在');
       servers[idx] = body;
       app.configManager.saveServers(servers);
       return sendJSON(res, 200, { success: true, message: '更新成功' });
@@ -146,7 +209,7 @@ async function handleRequest(req: IncomingMessage, res: ServerResponse): Promise
       const app = await getApp();
       // 先从 ServiceManager 移除（会检查运行状态）
       const removed = app.serviceManager.removeServer(body.id);
-      if (!removed) return sendJSON(res, 400, { success: false, error: '服务正在运行，无法删除' });
+      if (!removed) return sendError(res, 400, 'SERVER_RUNNING', '服务正在运行，无法删除');
       // 从 ConfigManager 持久化中移除
       let servers = app.configManager.getServers();
       servers = servers.filter(s => s.id !== body.id);
@@ -231,7 +294,7 @@ async function handleRequest(req: IncomingMessage, res: ServerResponse): Promise
       const body = await readBody<EventConfig>(req);
       const app = await getApp();
       const evt = app.eventManager.updateEvent(body.id, body);
-      if (!evt) return sendJSON(res, 404, { success: false, error: '事件不存在' });
+      if (!evt) return sendError(res, 404, 'EVENT_NOT_FOUND', '事件不存在');
       // 持久化
       const events = app.configManager.getEvents();
       const idx = events.findIndex(e => e.id === body.id);
@@ -245,7 +308,7 @@ async function handleRequest(req: IncomingMessage, res: ServerResponse): Promise
       const body = await readBody<{ id: string }>(req);
       const app = await getApp();
       const removed = app.eventManager.removeEvent(body.id);
-      if (!removed) return sendJSON(res, 404, { success: false, error: '事件不存在' });
+      if (!removed) return sendError(res, 404, 'EVENT_NOT_FOUND', '事件不存在');
       // 持久化
       let events = app.configManager.getEvents();
       events = events.filter(e => e.id !== body.id);
@@ -258,7 +321,7 @@ async function handleRequest(req: IncomingMessage, res: ServerResponse): Promise
       const body = await readBody<{ id: string; status: 'enabled' | 'disabled' }>(req);
       const app = await getApp();
       const evt = app.eventManager.toggleEvent(body.id, body.status);
-      if (!evt) return sendJSON(res, 404, { success: false, error: '事件不存在' });
+      if (!evt) return sendError(res, 404, 'EVENT_NOT_FOUND', '事件不存在');
       // 持久化
       const events = app.configManager.getEvents();
       const idx = events.findIndex(e => e.id === body.id);
@@ -294,7 +357,7 @@ async function handleRequest(req: IncomingMessage, res: ServerResponse): Promise
     if (method === 'POST' && pathname === '/api/client/send') {
       const body = await readBody<{
         serverId: string;
-        targetType?: 'broadcast' | 'client' | 'group';
+        targetType?: 'broadcast' | 'client';
         targetId?: string;
         event: string;
         messageType?: string;
@@ -305,49 +368,16 @@ async function handleRequest(req: IncomingMessage, res: ServerResponse): Promise
       const app = await getApp();
       const serverId = body.serverId || (body.clientId ? body.clientId.split('___')[0] : '');
       const transport = app.serviceManager.getTransport(serverId);
-      if (!transport) return sendJSON(res, 400, { success: false, error: `服务 ${serverId} 未运行` });
+      if (!transport) return sendError(res, 400, 'TRANSPORT_NOT_FOUND', `服务 ${serverId} 未运行`);
 
       const data = body.data ?? (body.content ? (body.messageType === 'json' ? JSON.parse(body.content) : body.content) : {});
-      if (body.targetType === 'broadcast' || !body.targetId) {
-        await transport.broadcast(body.event, data);
-        app.serviceManager.incrementSentMessages(serverId);
-        try {
-          app.logManager.addEntry({
-            id: nanoid(),
-            timestamp: new Date().toISOString(),
-            level: 'INFO',
-            event: body.event,
-            serverId: serverId,
-            message: `[消息中心] 广播消息 → 事件: ${body.event}, 内容: ${typeof data === 'string' ? data : JSON.stringify(data)}`,
-            metadata: { targetType: 'broadcast', targetId: undefined, event: body.event, content: typeof data === 'string' ? data : JSON.stringify(data) },
-          });
-          console.log(`[Log] Broadcast log entry added: ${body.event}`);
-        } catch (err) {
-          console.error('[Log] Failed to add broadcast log entry:', err);
-        }
-      } else {
-        // targetId 格式可能是 "serverId___socketId"，需要提取真正的 socketId
-        const socketId = body.targetId.includes('___')
-          ? body.targetId.split('___').slice(1).join('___')
-          : body.targetId;
-        await transport.send(socketId, body.event, data);
-        app.serviceManager.incrementSentMessages(serverId);
-        try {
-          app.logManager.addEntry({
-            id: nanoid(),
-            timestamp: new Date().toISOString(),
-            level: 'INFO',
-            event: body.event,
-            serverId: serverId,
-            clientId: body.targetId,
-            message: `[消息中心] 指定发送 → 客户端: ${body.targetId}, 事件: ${body.event}, 内容: ${typeof data === 'string' ? data : JSON.stringify(data)}`,
-            metadata: { targetType: body.targetType, targetId: body.targetId, event: body.event, content: typeof data === 'string' ? data : JSON.stringify(data) },
-          });
-          console.log(`[Log] Targeted log entry added: ${body.event} -> ${body.targetId}`);
-        } catch (err) {
-          console.error('[Log] Failed to add targeted log entry:', err);
-        }
-      }
+      await sendMessageAndLog(app, transport, {
+        serverId,
+        targetType: body.targetType ?? 'broadcast',
+        targetId: body.targetId,
+        event: body.event,
+        data,
+      });
       return sendJSON(res, 200, { success: true, message: '消息已发送' });
     }
 
@@ -355,7 +385,7 @@ async function handleRequest(req: IncomingMessage, res: ServerResponse): Promise
     if (method === 'POST' && pathname === '/api/send-message') {
       const body = await readBody<{
         serverId: string;
-        targetType: 'broadcast' | 'client' | 'group';
+        targetType: 'broadcast' | 'client';
         targetId?: string;
         event: string;
         messageType?: string;
@@ -363,81 +393,17 @@ async function handleRequest(req: IncomingMessage, res: ServerResponse): Promise
       }>(req);
       const app = await getApp();
       const transport = app.serviceManager.getTransport(body.serverId);
-      if (!transport) return sendJSON(res, 400, { success: false, error: `服务 ${body.serverId} 未运行` });
+      if (!transport) return sendError(res, 400, 'TRANSPORT_NOT_FOUND', `服务 ${body.serverId} 未运行`);
 
       const data = body.content ? (body.messageType === 'json' ? JSON.parse(body.content) : body.content) : {};
-      if (body.targetType === 'broadcast') {
-        await transport.broadcast(body.event, data);
-        app.serviceManager.incrementSentMessages(body.serverId);
-        try {
-          app.logManager.addEntry({
-            id: nanoid(),
-            timestamp: new Date().toISOString(),
-            level: 'INFO',
-            event: body.event,
-            serverId: body.serverId,
-            message: `[消息中心] 广播消息 → 事件: ${body.event}, 内容: ${typeof data === 'string' ? data : JSON.stringify(data)}`,
-            metadata: { targetType: 'broadcast', targetId: undefined, event: body.event, content: typeof data === 'string' ? data : JSON.stringify(data) },
-          });
-          console.log(`[Log] Send-message broadcast log entry added: ${body.event}`);
-        } catch (err) {
-          console.error('[Log] Failed to add send-message broadcast log entry:', err);
-        }
-      } else if (body.targetId) {
-        // targetId 格式可能是 "serverId___socketId"，需要提取真正的 socketId
-        const socketId = body.targetId.includes('___')
-          ? body.targetId.split('___').slice(1).join('___')
-          : body.targetId;
-        await transport.send(socketId, body.event, data);
-        app.serviceManager.incrementSentMessages(body.serverId);
-        try {
-          app.logManager.addEntry({
-            id: nanoid(),
-            timestamp: new Date().toISOString(),
-            level: 'INFO',
-            event: body.event,
-            serverId: body.serverId,
-            clientId: body.targetId,
-            message: `[消息中心] 指定发送 → 客户端: ${body.targetId}, 事件: ${body.event}, 内容: ${typeof data === 'string' ? data : JSON.stringify(data)}`,
-            metadata: { targetType: body.targetType, targetId: body.targetId, event: body.event, content: typeof data === 'string' ? data : JSON.stringify(data) },
-          });
-          console.log(`[Log] Send-message targeted log entry added: ${body.event} -> ${body.targetId}`);
-        } catch (err) {
-          console.error('[Log] Failed to add send-message targeted log entry:', err);
-        }
-      }
+      await sendMessageAndLog(app, transport, {
+        serverId: body.serverId,
+        targetType: body.targetType,
+        targetId: body.targetId,
+        event: body.event,
+        data,
+      });
       return sendJSON(res, 200, { success: true, message: '消息已发送' });
-    }
-
-    // ============ 消息模板 ============
-
-    // GET /api/templates
-    if (method === 'GET' && pathname === '/api/templates') {
-      const app = await getApp();
-      const templates: MessageTemplate[] = app.configManager.getTemplates();
-      return sendJSON(res, 200, { success: true, data: templates });
-    }
-
-    // POST /api/template/save
-    if (method === 'POST' && pathname === '/api/template/save') {
-      const body = await readBody<MessageTemplate>(req);
-      const app = await getApp();
-      const templates = app.configManager.getTemplates();
-      const idx = templates.findIndex(t => t.id === body.id);
-      if (idx >= 0) templates[idx] = body;
-      else templates.push(body);
-      app.configManager.saveTemplates(templates);
-      return sendJSON(res, 200, { success: true, message: '模板保存成功' });
-    }
-
-    // POST /api/template/delete
-    if (method === 'POST' && pathname === '/api/template/delete') {
-      const body = await readBody<{ id: string }>(req);
-      const app = await getApp();
-      let templates = app.configManager.getTemplates();
-      templates = templates.filter(t => t.id !== body.id);
-      app.configManager.saveTemplates(templates);
-      return sendJSON(res, 200, { success: true, message: '模板删除成功' });
     }
 
     // ============ 日志 ============
@@ -499,10 +465,10 @@ async function handleRequest(req: IncomingMessage, res: ServerResponse): Promise
     }
 
     // 404
-    sendJSON(res, 404, { success: false, error: 'Route not found: ' + method + ' ' + pathname });
+    sendError(res, 404, 'ROUTE_NOT_FOUND', 'Route not found: ' + method + ' ' + pathname);
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
-    sendJSON(res, 500, { success: false, error: msg });
+    sendError(res, 500, 'INTERNAL_ERROR', msg);
   }
 }
 
@@ -514,7 +480,7 @@ export async function startApiServer(): Promise<void> {
   // 挂载 Socket.IO 管理通道（用于向前端实时推送数据）
   const io = new SocketIOServer(server, {
     path: '/admin/socket.io',
-    cors: { origin: '*' },
+    cors: { origin: ALLOWED_ORIGIN },
   });
 
   // 等待 app 初始化完成

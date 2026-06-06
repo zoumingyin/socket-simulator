@@ -22,7 +22,7 @@ const { TextArea } = Input;
 export function MessageCenterPage(): React.ReactElement {
   const [messageApi, contextHolder] = message.useMessage();
   const {
-    templates, sending, error, fetchTemplates, sendMessage, broadcast, formatJSON, validateJSON, minifyJSON,
+    sending, error, sendMessage, broadcast, formatJSON, validateJSON, minifyJSON,
   } = useMessageStore();
   const { list: clients, fetchClients } = useClientStore();
   const { list: servers } = useServerStore();
@@ -35,7 +35,7 @@ export function MessageCenterPage(): React.ReactElement {
   const [content, setContent] = useState('{"msg":"hello"}');
   const [targetId, setTargetId] = useState<string>('');
 
-  useEffect(() => { fetchTemplates(); fetchClients(); fetchEvents(); }, []);
+  useEffect(() => { fetchClients(); fetchEvents(); }, []);
 
   const handleSend = async () => {
     if (!serverId || !event) { messageApi.warning('请填写服务和事件'); return; }
@@ -86,7 +86,6 @@ export function MessageCenterPage(): React.ReactElement {
             <Radio.Group value={targetType} onChange={e => setTargetType(e.target.value)}>
               <Radio.Button value="broadcast">广播</Radio.Button>
               <Radio.Button value="client">指定客户端</Radio.Button>
-              <Radio.Button value="group">指定分组</Radio.Button>
             </Radio.Group>
           </Space>
 
@@ -128,12 +127,6 @@ export function MessageCenterPage(): React.ReactElement {
                     </Select.Option>
                   ))}
               </Select>
-            </Space>
-          )}
-          {targetType === 'group' && (
-            <Space>
-              <Text>分组ID：</Text>
-              <Input value={targetId} onChange={e => setTargetId(e.target.value)} style={{ width: 300 }} placeholder="输入分组ID" />
             </Space>
           )}
 
@@ -189,21 +182,6 @@ export function MessageCenterPage(): React.ReactElement {
 
           <Button type="primary" icon={<SendOutlined />} onClick={handleSend} loading={sending}>发送消息</Button>
           {error && <Text type="danger">{error}</Text>}
-        </Space>
-      </Card>
-
-      <Card title="消息模板" variant="outlined">
-        <Space direction="vertical" style={{ width: '100%' }}>
-          {templates.map(t => (
-            <div key={t.id} style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 0', borderBottom: '1px solid #f0f0f0' }}>
-              <Space>
-                <Tag color={t.isDefault ? 'blue' : 'default'}>{t.isDefault ? '默认' : '自定义'}</Tag>
-                <Text strong>{t.name}</Text>
-                <Text type="secondary">{t.event}</Text>
-              </Space>
-              <Button size="small" onClick={() => { setEvent(t.event); setMessageType(t.messageType); setContent(t.content); }}>使用</Button>
-            </div>
-          ))}
         </Space>
       </Card>
     </div>
