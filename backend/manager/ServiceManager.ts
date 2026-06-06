@@ -292,7 +292,34 @@ export class ServiceManager extends EventEmitter {
     const existing = this.runtimes.get(id);
     if (existing) {
       this.runtimes.set(id, { ...existing, ...patch });
+      // 触发 runtime_updated 事件，通知前端数据变化
+      if (patch.sentMessages !== undefined || patch.receivedMessages !== undefined) {
+        console.log(`[ServiceManager] updateRuntime ${id}: sent=${patch.sentMessages !== undefined ? patch.sentMessages : '~'}, recv=${patch.receivedMessages !== undefined ? patch.receivedMessages : '~'}`);
+      }
+      this.emit('runtime_updated', this.getRuntimes());
+      console.log(`[ServiceManager] 已 emit runtime_updated 事件 (id=${id})`);
+    } else {
+      console.warn(`[ServiceManager] updateRuntime 警告: id=${id} 不存在，无法更新`);
     }
+  }
+
+  /**
+   * 增加指定服务的发送消息计数
+   * @param serverId 服务 ID
+   * @param count 增加的数量，默认为 1
+   */
+  incrementSentMessages(serverId: string, count: number = 1): void {
+    const rt = this.runtimes.get(serverId);
+    if (rt) {
+      this.updateRuntime(serverId, { sentMessages: rt.sentMessages + count });
+    }
+  }
+
+  /**
+   * 获取所有运行时状态（公开方法）
+   */
+  getRuntimes(): Record<string, ServerRuntime> {
+    return Object.fromEntries(this.runtimes.entries());
   }
 
   private createTransport(config: ServerConfig): ITransport {
@@ -337,6 +364,7 @@ export class ServiceManager extends EventEmitter {
     });
 
     transport.on('message', (clientId: string, event: string, data: unknown) => {
+      console.log(`[ServiceManager] 收到客户端消息: serverId=${serverId}, clientId=${clientId}, event=${event}`);
       this.updateRuntime(serverId, {
         receivedMessages: (this.runtimes.get(serverId)?.receivedMessages ?? 0) + 1,
       });

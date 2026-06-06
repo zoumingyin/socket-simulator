@@ -44,3 +44,4 @@ __pycache__/
 
 # Tauri
 src-tauri/gen/
+.workbuddy

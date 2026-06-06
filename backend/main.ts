@@ -40,6 +40,8 @@ export class SocketServiceApp extends EventEmitter {
     this.serviceManager.setClientManager(this.clientManager);
     this.serviceManager.setConfigManager(this.configManager);
     this.serviceManager.setLogManager(this.logManager);
+    // 注册 EventManager 消息发送回调，用于更新 sentMessages 计数
+    this.eventManager.setOnMessageSent((serverId) => this.serviceManager.incrementSentMessages(serverId));
     this.serviceManager.loadConfig(servers, autoStartIds);
 
     // 4. 监听 ServiceManager 的传输层事件
@@ -156,7 +158,7 @@ export async function getApp(): Promise<SocketServiceApp> {
 /** 启动所有服务（供外部调用或直接使用） */
 export async function startAll(): Promise<void> {
   await getApp();
-  startApiServer();
+  await startApiServer();
   console.log('[main] SocketServiceApp 已启动，API 监听端口 3080');
 }
 

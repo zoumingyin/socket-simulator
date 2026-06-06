@@ -31,7 +31,7 @@ export function ClientManagerPage(): React.ReactElement {
   
   const [viewMode, setViewMode] = useState<ViewMode>('table');
 
-  useEffect(() => { fetchClients(); fetchGroups(); }, []);
+  useEffect(() => { fetchClients(); }, []);
 
   // 筛选逻辑
   const filtered = list.filter(c => {

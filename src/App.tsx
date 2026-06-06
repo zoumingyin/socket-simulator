@@ -22,6 +22,7 @@ import { EventManagerPage } from './pages/EventManager/EventManagerPage.jsx';
 import { MessageCenterPage } from './pages/MessageCenter/MessageCenterPage.jsx';
 import { LogViewerPage } from './pages/LogViewer/LogViewerPage.jsx';
 import { SettingsPage } from './pages/Settings/SettingsPage.jsx';
+import { adminSocket } from './socket/AdminSocketManager.js';
 
 
 
@@ -42,6 +43,13 @@ function AppLayout(): React.ReactElement {
 
   useEffect(() => {
     document.title = 'Socket 服务管理平台';
+
+    // 全局唯一 WebSocket 连接 — 整个应用生命周期只建立一次
+    adminSocket.connect();
+
+    return () => {
+      adminSocket.disconnect();
+    };
   }, []);
 
   const isDark = themeMode === 'dark';

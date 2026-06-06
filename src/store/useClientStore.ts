@@ -1,9 +1,13 @@
 /**
  * useClientStore - 客户端管理 Zustand Store
+ *
+ * 数据获取策略：初始加载使用 HTTP，后续更新通过 WebSocket 实时推送
  */
+
 import { create } from 'zustand';
 import type { ClientInfo, SendMessageRequest, ClientGroup } from '../types/index';
 import { apiFetch } from '../api/client';
+import { adminSocket } from '../socket/AdminSocketManager';
 
 interface ClientState {
   list: ClientInfo[];
@@ -19,6 +23,18 @@ interface ClientState {
   search: (keyword: string) => ClientInfo[];
 }
 
+// 订阅 client_update 事件
+let clientSubscribed = false;
+function subscribeClientUpdates(): void {
+  if (clientSubscribed) return;
+  clientSubscribed = true;
+
+  adminSocket.subscribe('client_update', (data) => {
+    const clients = data as ClientInfo[];
+    useClientStore.setState({ list: clients });
+  });
+}
+
 export const useClientStore = create<ClientState>((set, get) => ({
   list: [],
   groups: [],
@@ -26,6 +42,8 @@ export const useClientStore = create<ClientState>((set, get) => ({
   error: undefined,
 
   async fetchClients(serverId) {
+    subscribeClientUpdates();
+    // HTTP 首次加载
     set({ loading: true, error: undefined });
     try {
       const url = serverId ? `/api/clients?serverId=${serverId}` : '/api/clients';
@@ -37,10 +55,13 @@ export const useClientStore = create<ClientState>((set, get) => ({
   },
 
   async fetchGroups() {
+    // 后端暂未实现 client-groups API，静默处理
     try {
       const res = await apiFetch<ClientGroup[]>('/api/client-groups');
       set({ groups: res.data ?? [] });
-    } catch { /* ignore */ }
+    } catch {
+      set({ groups: [] });
+    }
   },
 
   async sendMessage(req) {

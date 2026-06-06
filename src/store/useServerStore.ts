@@ -1,11 +1,13 @@
 /**
  * useServerStore - 服务管理 Zustand Store
  * 管理服务配置列表、运行时状态、加载状态
+ *
+ * 数据获取策略：初始加载使用 HTTP，后续更新全部通过 WebSocket 实时推送
  */
 import { create } from 'zustand';
-import type { ServerConfig, ServerRuntime, ApiResponse } from '../types/index';
+import type { ServerConfig, ServerRuntime } from '../types/index';
 import { apiFetch } from '../api/client';
-import { nanoid } from 'nanoid';
+import { adminSocket } from '../socket/AdminSocketManager';
 
 interface ServerState {
   list: ServerConfig[];
@@ -29,7 +31,18 @@ interface ServerState {
   batchRestart: (ids: string[]) => Promise<void>;
   batchDelete: (ids: string[]) => Promise<void>;
   setRuntime: (id: string, rt: ServerRuntime) => void;
-  setRuntimes: (rts: Record<string, ServerRuntime>) => void;
+}
+
+// 订阅 runtime_update 事件（store 外部，只注册一次）
+let runtimeSubscribed = false;
+function subscribeRuntimeUpdates(): void {
+  if (runtimeSubscribed) return;
+  runtimeSubscribed = true;
+
+  adminSocket.subscribe('runtime_update', (data) => {
+    const runtimes = data as Record<string, ServerRuntime>;
+    useServerStore.setState({ runtimes });
+  });
 }
 
 export const useServerStore = create<ServerState>((set, get) => ({
@@ -49,11 +62,13 @@ export const useServerStore = create<ServerState>((set, get) => ({
   },
 
   async fetchRuntimes() {
+    subscribeRuntimeUpdates();
+    // HTTP 作为首次加载兜底
     try {
       const res = await apiFetch<Record<string, ServerRuntime>>('/server/runtimes');
       if (res.data) set({ runtimes: res.data });
     } catch {
-      // 忽略运行时获取失败
+      // 忽略 HTTP 失败，Socket 推送会更新数据
     }
   },
 
@@ -95,8 +110,7 @@ export const useServerStore = create<ServerState>((set, get) => ({
       method: 'POST',
       body: JSON.stringify({ id }),
     });
-    // 操作后刷新运行时状态
-    await get().fetchRuntimes();
+    // Socket 推送会自动更新 runtimes
   },
 
   async stopServer(id) {
@@ -104,7 +118,6 @@ export const useServerStore = create<ServerState>((set, get) => ({
       method: 'POST',
       body: JSON.stringify({ id }),
     });
-    await get().fetchRuntimes();
   },
 
   async restartServer(id) {
@@ -112,22 +125,18 @@ export const useServerStore = create<ServerState>((set, get) => ({
       method: 'POST',
       body: JSON.stringify({ id }),
     });
-    await get().fetchRuntimes();
   },
 
   async startAll() {
     await apiFetch(`/server/start-all`, { method: 'POST' });
-    await get().fetchRuntimes();
   },
 
   async stopAll() {
     await apiFetch(`/server/stop-all`, { method: 'POST' });
-    await get().fetchRuntimes();
   },
 
   async restartAll() {
     await apiFetch(`/server/restart-all`, { method: 'POST' });
-    await get().fetchRuntimes();
   },
 
   async batchStart(ids: string[]) {
@@ -148,9 +157,5 @@ export const useServerStore = create<ServerState>((set, get) => ({
 
   setRuntime(id, rt) {
     set((s) => ({ runtimes: { ...s.runtimes, [id]: rt } }));
-  },
-
-  setRuntimes(rts) {
-    set({ runtimes: rts });
   },
 }));

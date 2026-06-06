@@ -23,6 +23,7 @@ import type {
   ProtocolType,
 } from '../src/types/index';
 import { getApp } from '../main.js';
+import { Server as SocketIOServer } from 'socket.io';
 
 const PORT = 3080;
 
@@ -309,6 +310,7 @@ async function handleRequest(req: IncomingMessage, res: ServerResponse): Promise
       const data = body.data ?? (body.content ? (body.messageType === 'json' ? JSON.parse(body.content) : body.content) : {});
       if (body.targetType === 'broadcast' || !body.targetId) {
         await transport.broadcast(body.event, data);
+        app.serviceManager.incrementSentMessages(serverId);
         try {
           app.logManager.addEntry({
             id: nanoid(),
@@ -329,6 +331,7 @@ async function handleRequest(req: IncomingMessage, res: ServerResponse): Promise
           ? body.targetId.split('___').slice(1).join('___')
           : body.targetId;
         await transport.send(socketId, body.event, data);
+        app.serviceManager.incrementSentMessages(serverId);
         try {
           app.logManager.addEntry({
             id: nanoid(),
@@ -365,6 +368,7 @@ async function handleRequest(req: IncomingMessage, res: ServerResponse): Promise
       const data = body.content ? (body.messageType === 'json' ? JSON.parse(body.content) : body.content) : {};
       if (body.targetType === 'broadcast') {
         await transport.broadcast(body.event, data);
+        app.serviceManager.incrementSentMessages(body.serverId);
         try {
           app.logManager.addEntry({
             id: nanoid(),
@@ -385,6 +389,7 @@ async function handleRequest(req: IncomingMessage, res: ServerResponse): Promise
           ? body.targetId.split('___').slice(1).join('___')
           : body.targetId;
         await transport.send(socketId, body.event, data);
+        app.serviceManager.incrementSentMessages(body.serverId);
         try {
           app.logManager.addEntry({
             id: nanoid(),
@@ -503,8 +508,60 @@ async function handleRequest(req: IncomingMessage, res: ServerResponse): Promise
 
 // ==================== 启动服务器 ====================
 
-export function startApiServer(): void {
+export async function startApiServer(): Promise<void> {
   const server = createServer(handleRequest);
+
+  // 挂载 Socket.IO 管理通道（用于向前端实时推送数据）
+  const io = new SocketIOServer(server, {
+    path: '/admin/socket.io',
+    cors: { origin: '*' },
+  });
+
+  // 等待 app 初始化完成
+  const app = await getApp();
+  console.log('[AdminSocket] app 已初始化，准备注册 Socket.IO 管理通道');
+
+  io.on('connection', (socket) => {
+    console.log('[AdminSocket] 管理界面已连接:', socket.id);
+
+    // 发送初始数据（runtimes + clients + logs）
+    try {
+      socket.emit('runtime_update', app.serviceManager.getRuntimes());
+      socket.emit('client_update', app.clientManager.getClients());
+      socket.emit('log_batch', app.logManager.getEntries().slice(-100)); // 只推送最近 100 条
+    } catch (err) {
+      console.error('[AdminSocket] 发送初始数据失败:', err);
+    }
+
+    socket.on('disconnect', () => {
+      console.log('[AdminSocket] 管理界面已断开:', socket.id);
+    });
+
+    // 前端心跳响应
+    socket.on('admin_ping', () => {
+      socket.emit('admin_pong', Date.now());
+    });
+  });
+
+  // 监听 ServiceManager 的 runtime_updated 事件，实时推送给前端
+  app.serviceManager.on('runtime_updated', (runtimes: Record<string, ServerRuntime>) => {
+    io.emit('runtime_update', runtimes);
+  });
+
+  // 监听 LogManager 的 log 事件，实时推送单条日志
+  app.logManager.on('log', (entry: LogEntry) => {
+    io.emit('log_update', entry);
+  });
+
+  // 监听客户端连接/断开事件，实时推送客户端列表
+  app.serviceManager.on('client_connect', () => {
+    io.emit('client_update', app.clientManager.getClients());
+  });
+  app.serviceManager.on('client_disconnect', () => {
+    io.emit('client_update', app.clientManager.getClients());
+  });
+
+  console.log('[AdminSocket] 已注册所有实时推送事件 (runtime_update, log_update, client_update)');
 
   server.on('error', (err: NodeJS.ErrnoException) => {
     if (err.code === 'EADDRINUSE') {

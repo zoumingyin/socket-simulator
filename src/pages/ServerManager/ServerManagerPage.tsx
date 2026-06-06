@@ -1,7 +1,7 @@
 /**
  * ServerManagerPage - 服务管理页面（优化版）
  * 支持：新增/编辑/删除/启动/停止/重启服务，以及启动全部/停止全部/重启全部
- * 优化：添加批量操作、状态筛选、卡片视图切换
+ * 所有运行时数据通过 WebSocket 实时推送，无轮询
  */
 import React, { useEffect, useState } from 'react';
 import {
@@ -43,12 +43,9 @@ export function ServerManagerPage(): React.ReactElement {
   const [viewMode, setViewMode] = useState<ViewMode>('table');
   const [selectedRowKeys, setSelectedRowKeys] = useState<React.Key[]>([]);
 
-  useEffect(() => { fetchServers(); fetchRuntimes(); }, []);
-
-  // 轮询运行时状态（每 3 秒）
   useEffect(() => {
-    const timer = setInterval(() => fetchRuntimes(), 3000);
-    return () => clearInterval(timer);
+    fetchServers();
+    fetchRuntimes();
   }, []);
 
   const openAdd = () => { setEditing(null); form.resetFields(); setModalOpen(true); };

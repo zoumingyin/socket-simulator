@@ -1,6 +1,7 @@
 /**
  * LogViewerPage - 日志查看器页面
  * 支持自动滚动、关键字搜索、按服务/事件/客户端过滤、导出/清空日志
+ * 日志数据通过 WebSocket 实时推送，无轮询
  */
 import React, { useEffect, useState } from 'react';
 import {
@@ -20,12 +21,8 @@ export function LogViewerPage(): React.ReactElement {
   const [exportPath, setExportPath] = useState('');
   const [exporting, setExporting] = useState(false);
 
-  useEffect(() => { fetchLogs(); }, []);
-
-  // 轮询日志（每 3 秒）
   useEffect(() => {
-    const timer = setInterval(() => fetchLogs(), 3000);
-    return () => clearInterval(timer);
+    fetchLogs();
   }, []);
 
   const handleExport = async () => {

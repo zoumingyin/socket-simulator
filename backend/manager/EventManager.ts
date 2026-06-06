@@ -27,6 +27,13 @@ export class EventManager extends EventEmitter {
   /** 轮询定时器 Map<eventId, PollingEntry> */
   private pollingTimers = new Map<string, PollingEntry>();
 
+  /** 消息发送回调：当事件触发广播消息时，通知 ServiceManager 更新 sentMessages */
+  private onMessageSent?: (serverId: string) => void;
+
+  setOnMessageSent(callback: (serverId: string) => void): void {
+    this.onMessageSent = callback;
+  }
+
   // ==================== 轮询管理 ====================
 
   /** 解析消息内容：尝试 JSON.parse，失败则作为纯文本包装 */
@@ -50,6 +57,7 @@ export class EventManager extends EventEmitter {
       if (!transport) return;
       try {
         const data = evt.defaultMessage ? this.parseMessage(evt.defaultMessage) : {};
+        this.onMessageSent?.(evt.serverId);
         transport.broadcast(evt.name, data).catch((err: Error) => {
           console.error(`[EventManager] 轮询广播失败 event=${evt.name}:`, err.message);
         });
@@ -202,6 +210,7 @@ export class EventManager extends EventEmitter {
     } else {
       await transport.broadcast(eventName, data);
     }
+    this.onMessageSent?.(serverId);
   }
 
   // ==================== Socket.IO 动态事件注册 ====================

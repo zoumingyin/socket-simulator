@@ -1,6 +1,6 @@
 /**
- * DashboardPage - 统计面板首页（优化版）
- * 添加卡片悬停效果、响应式布局、迷你图表
+ * DashboardPage - 统计面板首页
+ * 所有数据通过 WebSocket 实时推送获取，无轮询
  */
 import React, { useEffect, useState } from "react";
 import {
@@ -20,19 +20,17 @@ import {
   CloudServerOutlined,
   TeamOutlined,
   ThunderboltOutlined,
-  MessageOutlined,
   ArrowUpOutlined,
   ArrowDownOutlined,
   RiseOutlined,
   FallOutlined,
   ApiOutlined,
-  DisconnectOutlined,
 } from "@ant-design/icons";
 import { useServerStore } from "../../store/useServerStore.js";
 import { useClientStore } from "../../store/useClientStore.js";
-import type { ServerConfig, ServerRuntime } from "../../types/index.js";
+import type { ServerConfig } from "../../types/index.js";
 
-const { Title, Text, Paragraph } = Typography;
+const { Title, Text } = Typography;
 
 export function DashboardPage(): React.ReactElement {
   const {
@@ -49,17 +47,18 @@ export function DashboardPage(): React.ReactElement {
   } = useClientStore();
   const [refreshing, setRefreshing] = useState(false);
 
+  // 初始化：首次加载数据（WebSocket 连接由 App.tsx 全局管理）
   useEffect(() => {
     fetchServers();
     fetchRuntimes();
     fetchClients();
   }, []);
 
-  // 手动刷新
+  // 手动刷新（仅触发动画，数据由 Socket 推送保证最新）
   const handleRefresh = async () => {
     setRefreshing(true);
     await Promise.all([fetchServers(), fetchRuntimes(), fetchClients()]);
-    setTimeout(() => setRefreshing(false), 500);
+    setRefreshing(false);
   };
 
   const onlineCount = clients.filter((c) => c.status === "connected").length;
@@ -267,7 +266,7 @@ export function DashboardPage(): React.ReactElement {
         }
       >
         {serverLoading ? (
-          <Spin tip="加载中..." />
+          <Spin />
         ) : servers.length === 0 ? (
           <Empty description="暂无服务，请先添加服务" />
         ) : (
