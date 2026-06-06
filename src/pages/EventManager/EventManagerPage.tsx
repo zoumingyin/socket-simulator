@@ -102,6 +102,7 @@ export function EventManagerPage(): React.ReactElement {
       <Modal
         title={editing ? '编辑事件' : '新增事件'}
         open={modalOpen}
+        forceRender
         onOk={handleSave}
         onCancel={() => { setModalOpen(false); setEditing(null); }}
         width={560}

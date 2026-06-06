@@ -99,6 +99,7 @@ export function SettingsPage(): React.ReactElement {
     {
       key: 'basic',
       label: '基本设置',
+      forceRender: true,
       children: (
         <Form form={form} layout="vertical" style={{ maxWidth: 600, marginTop: 16 }}>
           <Form.Item 
@@ -123,7 +124,7 @@ export function SettingsPage(): React.ReactElement {
             rules={[{ required: true, message: '请输入日志保留天数' }]}
             tooltip="超过保留天数的日志将被自动清理"
           >
-            <InputNumber min={1} max={365} style={{ width: 100 }} /> <span>天</span>
+            <Space><InputNumber min={1} max={365} style={{ width: 100 }} /><span>天</span></Space>
           </Form.Item>
           <Form.Item 
             name="maxConnectionsPerServer" 
@@ -139,6 +140,7 @@ export function SettingsPage(): React.ReactElement {
     {
       key: 'heartbeat',
       label: '心跳配置',
+      forceRender: true,
       children: (
         <Form form={form} layout="vertical" style={{ maxWidth: 600, marginTop: 16 }}>
           <Form.Item 
@@ -155,7 +157,7 @@ export function SettingsPage(): React.ReactElement {
             rules={[{ required: true, message: '请输入 Ping 间隔' }]}
             tooltip="向客户端发送心跳包的间隔时间"
           >
-            <InputNumber min={5000} max={300000} style={{ width: 200 }} /> <span>ms</span>
+            <Space><InputNumber min={5000} max={300000} style={{ width: 200 }} /><span>ms</span></Space>
           </Form.Item>
           <Form.Item 
             name={['heartbeat', 'pongTimeout']} 
@@ -163,7 +165,7 @@ export function SettingsPage(): React.ReactElement {
             rules={[{ required: true, message: '请输入 Pong 超时' }]}
             tooltip="等待客户端响应心跳的超时时间，超过此时间将断开连接"
           >
-            <InputNumber min={10000} max={600000} style={{ width: 200 }} /> <span>ms</span>
+            <Space><InputNumber min={10000} max={600000} style={{ width: 200 }} /><span>ms</span></Space>
           </Form.Item>
         </Form>
       ),
@@ -171,6 +173,7 @@ export function SettingsPage(): React.ReactElement {
     {
       key: 'wss',
       label: 'WSS 配置',
+      forceRender: true,
       children: (
         <Form form={form} layout="vertical" style={{ maxWidth: 600, marginTop: 16 }}>
           <Form.Item 
@@ -201,6 +204,7 @@ export function SettingsPage(): React.ReactElement {
     {
       key: 'ipAccess',
       label: 'IP 访问控制',
+      forceRender: true,
       children: (
         <Form form={form} layout="vertical" style={{ maxWidth: 600, marginTop: 16 }}>
           <Form.Item 
@@ -223,6 +227,7 @@ export function SettingsPage(): React.ReactElement {
     {
       key: 'window',
       label: '窗口配置',
+      forceRender: true,
       children: (
         <Form form={windowForm} layout="vertical" style={{ maxWidth: 600, marginTop: 16 }}>
           <Form.Item 
@@ -230,14 +235,14 @@ export function SettingsPage(): React.ReactElement {
             label="窗口宽度"
             rules={[{ required: true, message: '请输入窗口宽度' }]}
           >
-            <InputNumber min={800} max={3840} style={{ width: 180 }} /> <span>px</span>
+            <Space><InputNumber min={800} max={3840} style={{ width: 180 }} /><span>px</span></Space>
           </Form.Item>
           <Form.Item 
             name="height" 
             label="窗口高度"
             rules={[{ required: true, message: '请输入窗口高度' }]}
           >
-            <InputNumber min={600} max={2160} style={{ width: 180 }} /> <span>px</span>
+            <Space><InputNumber min={600} max={2160} style={{ width: 180 }} /><span>px</span></Space>
           </Form.Item>
           <Form.Item 
             name="maximized" 

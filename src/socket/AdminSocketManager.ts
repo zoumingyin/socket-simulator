@@ -4,27 +4,27 @@
  * 功能：
  * - 单例模式，全局唯一 Socket.IO 管理通道连接
  * - 自动重连（指数退避 + 随机抖动）
- * - 应用层心跳保活（收到 pong 后清除超时定时器）
+ * - 被动心跳检测（后端主动推送 heartbeat，前端 30s 超时判定）
  * - 发布/订阅模式的事件分发
  * - 连接状态追踪
  *
  * 后端对应事件：
+ * - heartbeat       → 后端主动心跳（每 10s）
  * - runtime_update  → 运行时状态更新
  * - log_update      → 单条日志推送
  * - log_batch       → 批量日志推送（初始加载）
  * - client_update   → 客户端列表更新
- * - admin_pong      → 心跳响应
  */
 import { io, type Socket } from 'socket.io-client';
 
 // ==================== 类型定义 ====================
 
 export type SocketEvent =
+  | 'heartbeat'
   | 'runtime_update'
   | 'log_update'
   | 'log_batch'
   | 'client_update'
-  | 'admin_pong'
   | 'connect'
   | 'disconnect'
   | 'connect_error';
@@ -39,14 +39,13 @@ type StateListener = (state: ConnectionState) => void;
 const ADMIN_URL = 'http://localhost:3080';
 const ADMIN_PATH = '/admin/socket.io';
 
-/** 指数退避重连参数（Socket.IO 内置，此处仅作说明） */
-const RECONNECT_DELAY_MIN = 1000;   // 初始 1 秒
+/** 指数退避重连参数（Socket.IO 内置） */
+const RECONNECT_DELAY_MIN = 1000;    // 初始 1 秒
 const RECONNECT_DELAY_MAX = 30000;   // 最大 30 秒
-const RECONNECT_JITTER = 0.3;      // 30% 随机抖动
+const RECONNECT_JITTER = 0.3;       // 30% 随机抖动
 
-/** 心跳参数 */
-const HEARTBEAT_INTERVAL = 30000;   // 30 秒发一次 ping（略小于 Socket.IO 默认 ping 35s）
-const HEARTBEAT_TIMEOUT = 15000;    // 15 秒内未收到 pong 视为断线
+/** 心跳超时：30 秒未收到后端 heartbeat → 判定连接断开 */
+const HEARTBEAT_TIMEOUT = 30000;
 
 // ==================== 单例实现 ====================
 
@@ -55,9 +54,8 @@ class AdminSocketManager {
   private eventHandlers = new Map<SocketEvent, Set<EventHandler>>();
   private stateListeners = new Set<StateListener>();
   private _connectionState: ConnectionState = 'disconnected';
-  private _connecting = false; // 防止并发创建多个连接
+  private _connecting = false;
 
-  private heartbeatTimer: ReturnType<typeof setInterval> | null = null;
   private heartbeatTimeoutTimer: ReturnType<typeof setTimeout> | null = null;
   private reconnectAttempt = 0;
 
@@ -75,12 +73,8 @@ class AdminSocketManager {
 
   /**
    * 建立连接（全局唯一，严格幂等）
-   * — 已连接 → 直接返回
-   * — 正在连接中 → 直接返回（防竞态）
-   * — 未连接 → 创建新连接
    */
   connect(): void {
-    // 已连接或正在连接中，不重复创建
     if (this.socket?.connected) {
       return;
     }
@@ -89,7 +83,6 @@ class AdminSocketManager {
       return;
     }
 
-    // 清理旧连接（仅在已完全连接时才断开，避免 React Strict Mode 下中断握手报错）
     this.cleanupSocket();
 
     this._connecting = true;
@@ -109,13 +102,12 @@ class AdminSocketManager {
     });
 
     this.setupSocketListeners();
-    this.startHeartbeat();
   }
 
   /** 断开连接（仅主动断开时调用，如组件卸载） */
   disconnect(): void {
     this._connecting = false;
-    this.stopHeartbeat();
+    this.stopHeartbeatTimeout();
     this.cleanupSocket();
     this.setState('disconnected');
     console.log('[AdminSocket] 已主动断开全局管理通道');
@@ -131,20 +123,17 @@ class AdminSocketManager {
 
   // ==================== 事件订阅 ====================
 
-  /** 订阅事件（多次调用同一事件+handler 不会重复注册） */
   subscribe(event: SocketEvent, handler: EventHandler): () => void {
     if (!this.eventHandlers.has(event)) {
       this.eventHandlers.set(event, new Set());
     }
     this.eventHandlers.get(event)!.add(handler);
 
-    // 返回取消订阅函数
     return () => {
       this.eventHandlers.get(event)?.delete(handler);
     };
   }
 
-  /** 订阅连接状态变化 */
   onStateChange(listener: StateListener): () => void {
     this.stateListeners.add(listener);
     return () => {
@@ -160,7 +149,6 @@ class AdminSocketManager {
     this.stateListeners.forEach((fn) => fn(state));
   }
 
-  /** 清理 socket 实例（移除监听器 + 断开 + 清引用） */
   private cleanupSocket(): void {
     if (this.socket) {
       this.socket.removeAllListeners();
@@ -179,6 +167,7 @@ class AdminSocketManager {
       this._connecting = false;
       this.setState('connected');
       this.reconnectAttempt = 0;
+      // 连接成功后启动心跳超时检测
       this.resetHeartbeatTimeout();
       this.emitToHandlers('connect', undefined);
     });
@@ -186,15 +175,12 @@ class AdminSocketManager {
     this.socket.on('disconnect', (reason: string) => {
       console.log('[AdminSocket] 管理通道断开:', reason);
       this.setState('disconnected');
-      this.stopHeartbeat();
+      this.stopHeartbeatTimeout();
       this.emitToHandlers('disconnect', reason);
 
-      // 如果是服务器端主动断开，不自动重连（需用户手动重连）
       if (reason === 'io server disconnect') {
-        // 停止 Socket.IO 内置重连
         this.socket?.close();
       }
-      // 其他原因（transport close, ping timeout 等）由 Socket.IO 内置重连处理
     });
 
     this.socket.on('connect_error', (err: Error) => {
@@ -208,18 +194,21 @@ class AdminSocketManager {
       this.emitToHandlers('connect_error', err.message);
     });
 
-    // 心跳响应：收到 pong 后清除超时定时器（关键！）
-    this.socket.on('admin_pong', () => {
+    // ===== 后端主动推送的心跳 =====
+    // 后端每 10s 推送 heartbeat → 前端收到后重置 30s 超时
+    this.socket.on('heartbeat', () => {
       this.resetHeartbeatTimeout();
+      // 回复 ack 让后端更新 lastHeartbeat 时间
+      this.socket?.emit('heartbeat_ack');
     });
 
-    // 注册业务事件转发
+    // ===== 业务事件转发 =====
     const businessEvents: SocketEvent[] = [
       'runtime_update',
       'log_update',
       'log_batch',
       'client_update',
-      // admin_pong 已在上方单独处理（需要调用 resetHeartbeatTimeout）
+      // heartbeat 已在上方单独处理（需要调用 resetHeartbeatTimeout + reply ack）
     ];
 
     for (const evt of businessEvents) {
@@ -242,34 +231,25 @@ class AdminSocketManager {
     }
   }
 
-  // ==================== 心跳保活 ====================
+  // ==================== 心跳超时检测 ====================
 
-  private startHeartbeat(): void {
-    this.stopHeartbeat();
-
-    this.heartbeatTimer = setInterval(() => {
-      if (this.socket?.connected) {
-        this.socket.emit('admin_ping');
-        // 设置 pong 超时：15 秒内未收到 pong → 认为连接已死，触发重连
-        this.heartbeatTimeoutTimer = setTimeout(() => {
-          console.warn('[AdminSocket] 心跳超时（15s 未收到 pong），强制断开并重连');
-          // 通过 disconnect() 清理，再通过 connect() 重建（利用指数退避）
-          this.disconnect();
-          this.connect();
-        }, HEARTBEAT_TIMEOUT);
-      }
-    }, HEARTBEAT_INTERVAL);
-  }
-
-  private stopHeartbeat(): void {
-    if (this.heartbeatTimer !== null) {
-      clearInterval(this.heartbeatTimer);
-      this.heartbeatTimer = null;
-    }
-    this.resetHeartbeatTimeout();
-  }
-
+  /**
+   * 启动 / 重置心跳超时定时器
+   * 每次收到后端 heartbeat 时调用，将超时倒计时重置为 30 秒
+   * 若 30 秒内未收到 heartbeat → 判定断开，触发重连
+   */
   private resetHeartbeatTimeout(): void {
+    this.stopHeartbeatTimeout();
+
+    this.heartbeatTimeoutTimer = setTimeout(() => {
+      console.warn('[AdminSocket] 心跳超时（30s 未收到后端 heartbeat），判定连接断开');
+      // 通过 disconnect() 清理，再通过 connect() 重建（利用指数退避）
+      this.disconnect();
+      this.connect();
+    }, HEARTBEAT_TIMEOUT);
+  }
+
+  private stopHeartbeatTimeout(): void {
     if (this.heartbeatTimeoutTimer !== null) {
       clearTimeout(this.heartbeatTimeoutTimer);
       this.heartbeatTimeoutTimer = null;

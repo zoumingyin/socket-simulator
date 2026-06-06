@@ -345,6 +345,7 @@ export function ClientManagerPage(): React.ReactElement {
       <Modal
         title={`发送消息给 ${sendingTo?.id ?? ''}`}
         open={sendModalOpen}
+        forceRender
         onCancel={() => { setSendModalOpen(false); sendForm.resetFields(); }}
         onOk={handleSend}
         confirmLoading={sending}

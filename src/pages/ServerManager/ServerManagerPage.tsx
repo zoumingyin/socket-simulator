@@ -322,6 +322,7 @@ export function ServerManagerPage(): React.ReactElement {
       <Modal
         title={editing ? '编辑服务' : '新增服务'}
         open={modalOpen}
+        forceRender
         onOk={handleSave}
         onCancel={() => { setModalOpen(false); form.resetFields(); }}
         okText="保存"

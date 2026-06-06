@@ -91,7 +91,7 @@ export const useMessageStore = create<MessageState>((set, get) => ({
     }
   },
 
-  formatJSON(content) {
+  formatJSON(content: string) {
     try {
       const parsed = JSON.parse(content);
       return { ok: true, formatted: JSON.stringify(parsed, null, 2) };
@@ -100,7 +100,7 @@ export const useMessageStore = create<MessageState>((set, get) => ({
     }
   },
 
-  validateJSON(content) {
+  validateJSON(content: string) {
     try {
       JSON.parse(content);
       return { valid: true };
@@ -109,7 +109,7 @@ export const useMessageStore = create<MessageState>((set, get) => ({
     }
   },
 
-  minifyJSON(content) {
+  minifyJSON(content: string) {
     try {
       const parsed = JSON.parse(content);
       return { ok: true, minified: JSON.stringify(parsed) };

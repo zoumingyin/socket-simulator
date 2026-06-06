@@ -23,7 +23,7 @@ import type {
   ProtocolType,
 } from '../src/types/index';
 import { getApp } from '../main.js';
-import { Server as SocketIOServer } from 'socket.io';
+import { Server as SocketIOServer, type Socket as ServerSocket } from 'socket.io';
 
 const PORT = 3080;
 
@@ -521,25 +521,62 @@ export async function startApiServer(): Promise<void> {
   const app = await getApp();
   console.log('[AdminSocket] app 已初始化，准备注册 Socket.IO 管理通道');
 
+  // ==================== 心跳追踪 ====================
+
+  const HEARTBEAT_INTERVAL = 10000;  // 后端每 10s 发送一次心跳
+  const HEARTBEAT_TIMEOUT  = 30000;   // 30s 未收到心跳 → 僵尸连接
+
+  const adminClients = new Map<string, { socket: ServerSocket; lastHeartbeat: number }>();
+
+  // 定时清理僵尸连接（每 15s 检查一次）
+  const cleanupTimer = setInterval(() => {
+    const now = Date.now();
+    for (const [id, client] of adminClients) {
+      if (now - client.lastHeartbeat > HEARTBEAT_TIMEOUT) {
+        console.log(`[AdminSocket] 清理僵尸连接: ${id} (超过 ${HEARTBEAT_TIMEOUT}ms 无心跳)`);
+        adminClients.delete(id);
+        client.socket.disconnect(true);
+      }
+    }
+  }, 15000);
+
+  // 定时向所有已注册的管理客户端发送心跳
+  const heartbeatTimer = setInterval(() => {
+    for (const [id, client] of adminClients) {
+      if (client.socket.connected) {
+        client.socket.emit('heartbeat', Date.now());
+      }
+    }
+  }, HEARTBEAT_INTERVAL);
+
+  // ==================== 连接管理 ====================
+
   io.on('connection', (socket) => {
     console.log('[AdminSocket] 管理界面已连接:', socket.id);
+
+    // 注册客户端，记录初始心跳时间
+    adminClients.set(socket.id, { socket, lastHeartbeat: Date.now() });
 
     // 发送初始数据（runtimes + clients + logs）
     try {
       socket.emit('runtime_update', app.serviceManager.getRuntimes());
       socket.emit('client_update', app.clientManager.getClients());
-      socket.emit('log_batch', app.logManager.getEntries().slice(-100)); // 只推送最近 100 条
+      socket.emit('log_batch', app.logManager.getEntries().slice(-100));
     } catch (err) {
       console.error('[AdminSocket] 发送初始数据失败:', err);
     }
 
-    socket.on('disconnect', () => {
-      console.log('[AdminSocket] 管理界面已断开:', socket.id);
+    // 客户端手动心跳确认（更新心跳时间，防止被清理）
+    socket.on('heartbeat_ack', () => {
+      const client = adminClients.get(socket.id);
+      if (client) {
+        client.lastHeartbeat = Date.now();
+      }
     });
 
-    // 前端心跳响应
-    socket.on('admin_ping', () => {
-      socket.emit('admin_pong', Date.now());
+    socket.on('disconnect', () => {
+      console.log('[AdminSocket] 管理界面已断开:', socket.id);
+      adminClients.delete(socket.id);
     });
   });
 
