@@ -339,7 +339,7 @@ export function ServerManagerPage(): React.ReactElement {
           <Form.Item name="protocol" label="协议类型" rules={[{ required: true }]}>
             <Select placeholder="选择协议">
               <Option value="websocket">WebSocket</Option>
-              <Option value="socketio">Socket.IO</Option>
+              <Option value="socket.io">Socket.IO</Option>
             </Select>
           </Form.Item>
           <Form.Item name="ip" label="监听IP" rules={[{ required: true }]}>
