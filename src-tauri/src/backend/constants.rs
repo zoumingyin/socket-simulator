@@ -9,12 +9,6 @@ pub const DEFAULT_API_PORT: u16 = 3080;
 /// 管理端 WebSocket 路径
 pub const ADMIN_WS_PATH: &str = "/admin/ws";
 
-/// 开发期前端默认来源（CORS）
-pub const DEFAULT_ALLOWED_ORIGIN: &str = "http://localhost:4173";
-
-/// Tauri 前端 webview 来源（release 下）
-pub const TAURI_ORIGIN: &str = "tauri://localhost";
-
 /// 心跳：后端每多少毫秒推送一次 `heartbeat`
 pub const HEARTBEAT_INTERVAL_MS: u64 = 10_000;
 
@@ -66,7 +60,3 @@ pub fn api_port() -> u16 {
     DEFAULT_API_PORT
 }
 
-/// 读取允许的 CORS 来源（允许通过环境变量 `ALLOWED_ORIGIN` 覆盖）
-pub fn allowed_origin() -> String {
-    std::env::var("ALLOWED_ORIGIN").unwrap_or_else(|_| DEFAULT_ALLOWED_ORIGIN.to_string())
-}
