@@ -4,12 +4,19 @@
  */
 import { EventEmitter } from 'events';
 import { appendFileSync, readFileSync, writeFileSync, existsSync, mkdirSync } from 'fs';
-import { join } from 'path';
+import { join, resolve } from 'path';
 import type { LogEntry, LogLevel, LogFilter } from '../src/types/index';
 
 // 不用 import.meta.url + fileURLToPath（Windows 路径含 \n 等会被解码成换行符）
-// 改用 process.cwd()，假定后端从 backend/ 目录启动
-const logDir = join(process.cwd(), '../logs');
+// 改用 process.cwd()，假定后端从 backend/ 目录启动（dev 模式）
+// 打包后由 Tauri sidecar 传入 SSM_DATA_DIR（用户可写目录），优先使用，避免写 Program Files 无权限
+function getDataBaseDir(): string {
+  return process.env.SSM_DATA_DIR
+    ? resolve(process.env.SSM_DATA_DIR)
+    : resolve(process.cwd(), '..');
+}
+
+const logDir = join(getDataBaseDir(), 'logs');
 
 export class LogManager extends EventEmitter {
   private entries: LogEntry[] = [];

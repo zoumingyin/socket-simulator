@@ -17,6 +17,6 @@ serde_json = "1"
 tauri-build = { version = "2", features = [] }
 
 [features]
-default = ["custom-protocol"]
+default = ["custom-protocol", "devtools"]
 custom-protocol = ["tauri/custom-protocol"]
 devtools = ["tauri/devtools"]

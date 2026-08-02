@@ -164,6 +164,17 @@ fn setup_tray(app: &App) -> tauri::Result<()> {
     Ok(())
 }
 
+/// 打开开发者工具（F12）
+#[tauri::command]
+fn open_devtools(app: AppHandle) {
+    #[cfg(feature = "devtools")]
+    {
+        if let Some(window) = app.get_webview_window("main") {
+            window.open_devtools();
+        }
+    }
+}
+
 fn main() {
     // 检查是否应该启动时最小化
     let start_minimized = should_start_minimized();
@@ -171,7 +182,7 @@ fn main() {
 
     tauri::Builder::default()
         .plugin(tauri_plugin_shell::init())
-        .invoke_handler(tauri::generate_handler![])
+        .invoke_handler(tauri::generate_handler![open_devtools])
         .setup(move |app| {
             // 获取 Tauri 自动创建的窗口（根据 tauri.conf.json 的 app.windows 配置）
             let window = app.get_webview_window("main").unwrap();

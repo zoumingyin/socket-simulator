@@ -14,8 +14,15 @@ import type {
 } from "../src/types/index";
 
 // 不用 import.meta.url + fileURLToPath（Windows 路径含 \n 等会被解码成换行符）
-// 改用 process.cwd()，假定后端从 backend/ 目录启动
-const configDir = path.resolve(process.cwd(), "../config");
+// 改用 process.cwd()，假定后端从 backend/ 目录启动（dev 模式）
+// 打包后由 Tauri sidecar 传入 SSM_DATA_DIR（用户可写目录），优先使用，避免写 Program Files 无权限
+function getDataBaseDir(): string {
+  return process.env.SSM_DATA_DIR
+    ? path.resolve(process.env.SSM_DATA_DIR)
+    : path.resolve(process.cwd(), "..");
+}
+
+const configDir = path.join(getDataBaseDir(), "config");
 const configFile = path.join(configDir, "config.json");
 
 interface DBData extends PersistedConfig {}
