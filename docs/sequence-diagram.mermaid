@@ -1,0 +1,102 @@
+%% ============ 5.1 启动初始化链路 ============
+sequenceDiagram
+    participant Tauri as Tauri setup
+    participant FS as 文件系统
+    participant Backend as Backend::new
+    participant Cfg as ConfigManager
+    participant Svc as ServiceManager
+    participant Evt as EventManager
+    participant Axum as axum Server
+    participant Bus as EventBus
+
+    Tauri->>FS: app.path().app_data_dir() → 建 config/ logs/
+    Tauri->>Backend: Backend::new(app_handle)
+    Backend->>Cfg: init() 读 config.json（缺失→默认+clamp）
+    Cfg-->>Backend: servers / events / settings
+    Backend->>Evt: load_events(events)
+    Backend->>Svc: 注入 client/log/config Manager + 加载 servers
+    Backend->>Bus: 构造 broadcast 发送端
+    Tauri->>Backend: spawn(backend::run)
+    Backend->>Svc: 对每个 autoStart 服务 start_server()
+    Svc->>Svc: spawn WsServer accept loop（tokio-tungstenite）
+    Backend->>Axum: serve(127.0.0.1:3080) + /admin/ws
+    Axum-->>Tauri: 监听就绪（前端可连）
+
+%% ============ 5.2 一次 REST 请求（POST /api/server/start） ============
+sequenceDiagram
+    participant FE as 前端
+    participant Axum as axum Router
+    participant H as handlers
+    participant Svc as ServiceManager
+    participant Ws as WsServer
+    participant Bus as EventBus
+
+    FE->>Axum: POST /api/server/start {id}
+    Axum->>H: handler(State<Arc<Backend>>, Json)
+    H->>Svc: start_server(id)
+    Svc->>Ws: new(cfg) + accept_loop()（bind ip:port）
+    Ws-->>Svc: 启动成功
+    Svc->>Svc: update_runtime(status=running)
+    Svc->>Bus: publish_runtime(runtimes)
+    Bus-->>Axum: runtime_update 推送（经 AdminHub）
+    H-->>FE: {success:true, message:"启动成功"}
+
+%% ============ 5.3 一次受管服务 WS 客户端连接/消息/断开 ============
+sequenceDiagram
+    participant C as 外部 WS 客户端
+    participant Ws as WsServer(accept loop)
+    participant Svc as ServiceManager
+    participant CM as ClientManager
+    participant Bus as EventBus
+    participant LM as LogManager
+
+    C->>Ws: TCP/WS 握手（携带 IP）
+    Ws->>Ws: IP 过滤(P1-3) + maxConnections 检查(P1/f)
+    Ws->>Ws: 生成 clientId=nanoid(16)，建连接
+    Ws->>Svc: emit connect(ClientInfo)
+    Svc->>CM: add_client(serverId___socketId)
+    Svc->>Bus: publish_client(get_clients())
+    C->>Ws: 文本帧 {event,data}
+    Ws->>Svc: emit message(socketId, event, data)
+    Svc->>Svc: update_runtime(receivedMessages+1)
+    Svc->>LM: add_entry(客户端消息日志)
+    C->>Ws: 关闭
+    Ws->>Svc: emit disconnect(socketId)
+    Svc->>CM: remove_client(serverId___socketId)
+    Svc->>Bus: publish_client(get_clients())
+
+%% ============ 5.4 一次管理端 WS 推送（runtime_updated 广播） ============
+sequenceDiagram
+    participant Svc as ServiceManager
+    participant Bus as EventBus
+    participant Hub as AdminHub
+    participant A as 管理端 WS 客户端
+
+    Svc->>Bus: publish_runtime(runtimes)
+    Bus->>Hub: broadcast::Receiver 收到 runtime_update
+    Hub->>A: ws.send({event:"runtime_update", data:runtimes})
+    Note over A: 前端 AdminSocketManager 分发到 useServerStore
+
+%% ============ 5.5 端口冲突释放重试 ============
+sequenceDiagram
+    participant Svc as ServiceManager
+    participant Ws as WsServer
+    participant PR as port_release
+    participant OS as 系统(netstat/taskkill 或 lsof/kill)
+
+    Svc->>Ws: start() → TcpListener::bind(ip:port)
+    Ws-->>Svc: Err(AddressInUse / EADDRINUSE)
+    Svc->>PR: release_port(port)
+    PR->>OS: 查占用 PID（netstat -ano | lsof）
+    OS-->>PR: PID 列表
+    PR->>OS: taskkill /PID /F 或 kill -9
+    PR-->>Svc: killed=true
+    Svc->>Svc: sleep(800ms)
+    Svc->>Ws: start() 重试一次（retryOnConflict=false）
+    alt 仍失败
+        Ws-->>Svc: Err
+        Svc->>Svc: update_runtime(status=error, error=msg)
+    else 成功
+        Ws-->>Svc: Ok
+        Svc->>Svc: update_runtime(status=running)
+    end

@@ -1,0 +1,142 @@
+classDiagram
+    %% ===== 编排层 =====
+    class Backend {
+        +Arc~ConfigManager~ config_manager
+        +Arc~LogManager~ log_manager
+        +Arc~ClientManager~ client_manager
+        +Arc~EventManager~ event_manager
+        +Arc~ServiceManager~ service_manager
+        +Arc~EventBus~ event_bus
+        +new(app_handle) Backend
+        +run(self) Task
+        +shutdown(self) Task
+    }
+
+    class EventBus {
+        +broadcast~Sender~ runtime_update_tx
+        +broadcast~Sender~ client_update_tx
+        +broadcast~Sender~ log_update_tx
+        +publish_runtime(map) void
+        +publish_client(list) void
+        +publish_log(entry) void
+    }
+
+    %% ===== Manager 层 =====
+    class ServiceManager {
+        -Arc~Mutex~HashMap~String,ServerConfig~~ servers
+        -Arc~Mutex~HashMap~String,ServerRuntime~~ runtimes
+        -Arc~Mutex~HashMap~String,JoinHandle~~ handles
+        -Option~Arc~ClientManager~~ client_manager
+        -Option~Arc~LogManager~~ log_manager
+        -Option~Arc~ConfigManager~~ config_manager
+        +add_server(cfg) ServerConfig
+        +update_server(id, patch) Option~ServerConfig~
+        +remove_server(id) bool
+        +start_server(id) Task
+        +stop_server(id) Task
+        +restart_server(id) Task
+        +start_all() Task
+        +stop_all() Task
+        +restart_all() Task
+        +increment_sent_messages(id, n) void
+    }
+
+    class ClientManager {
+        -Arc~Mutex~HashMap~String,ClientInfo~~ clients
+        -Arc~Mutex~HashMap~String,ClientGroup~~ groups
+        +add_client(info) void
+        +remove_client(id) void
+        +get_clients(server_id) Vec~ClientInfo~
+        +send_to_client(server_id, client_id, event, data) Task
+        +broadcast(server_id, event, data, target_ids) Task
+        +disconnect_client(server_id, client_id) Task
+        +search(keyword) Vec~ClientInfo~
+        +create_group(..) ClientGroup
+    }
+
+    class EventManager {
+        -Arc~Mutex~HashMap~String,EventConfig~~ events
+        -Arc~Mutex~HashMap~String,JoinHandle~~ timers
+        +load_events(list) void
+        +add_event(cfg) EventConfig
+        +update_event(id, patch) Option~EventConfig~
+        +remove_event(id) bool
+        +toggle_event(id, status) Option~EventConfig~
+        +emit_event(server_id, target, event, data) Task
+        +on_server_status_change(server_id, running) void
+        +refresh_all_polling() void
+    }
+
+    class LogManager {
+        -Arc~Mutex~Vec~LogEntry~~ entries
+        -usize max_memory
+        +add_entry(entry) void
+        +get_entries(filter) Vec~LogEntry~
+        +clear_entries() void
+        +export_to_file(path) void
+        +import_from_file(path) void
+        +cleanup_old(days) Task
+    }
+
+    class ConfigManager {
+        -PathBuf config_file
+        -mpsc~Sender~WriteOp~ writer_tx
+        +init() void
+        +get_servers() Vec~ServerConfig~
+        +save_servers(list) void
+        +get_events() Vec~EventConfig~
+        +save_events(list) void
+        +get_system_settings() SystemSettings
+        +save_system_settings(s) void
+        +get_window_config() WindowConfig
+        +save_window_config(c) void
+        +export_all() PersistedConfig
+        +import_all(cfg) void
+    }
+
+    %% ===== 传输层 =====
+    class Transport {
+        <<trait>>
+        +start() Task
+        +stop() Task
+        +send(client_id, event, data) Task
+        +broadcast(event, data, target_ids) Task
+        +disconnect_client(client_id) Task
+        +is_running() bool
+    }
+
+    class WsServer {
+        -ServerConfig cfg
+        -Arc~Mutex~HashMap~String,WsStream~~ clients
+        -Option~TlsAcceptor~ tls
+        +new(cfg, sys_settings) WsServer
+        +accept_loop(self) Task
+    }
+    Transport <|.. WsServer : implements
+
+    %% ===== 管理 WS =====
+    class AdminHub {
+        +on_connect(ws) Task
+        -forward_loop(rx, socket) Task
+        -heartbeat_loop(conns) Task
+    }
+
+    %% ===== 关系 =====
+    Backend *-- ServiceManager
+    Backend *-- ClientManager
+    Backend *-- EventManager
+    Backend *-- LogManager
+    Backend *-- ConfigManager
+    Backend *-- EventBus
+
+    ServiceManager ..> ClientManager : 注入/注册
+    ServiceManager ..> LogManager : 写日志
+    ServiceManager ..> ConfigManager : 读系统设置
+    ServiceManager ..> WsServer : 创建
+    ClientManager ..> Transport : 经 transport 发消息
+    EventManager ..> Transport : 轮询广播
+    ServiceManager ..> EventBus : publish_runtime/client
+    LogManager ..> EventBus : publish_log
+    ClientManager ..> EventBus : publish_client
+    AdminHub ..> EventBus : subscribe
+    WsServer ..> ClientManager : 连接时 add_client
