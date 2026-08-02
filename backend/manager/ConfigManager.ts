@@ -3,20 +3,20 @@
  * 负责 config.json（统一存储所有配置）的读写
  * 使用纯 fs 实现，避免 steno (lowdb) 在 Windows 上的 EBADF 问题
  */
-import fs from 'fs';
-import path from 'path';
+import fs from "fs";
+import path from "path";
 import type {
   ServerConfig,
   EventConfig,
   SystemSettings,
   WindowConfig,
   PersistedConfig,
-} from '../src/types/index';
+} from "../src/types/index";
 
 // 不用 import.meta.url + fileURLToPath（Windows 路径含 \n 等会被解码成换行符）
 // 改用 process.cwd()，假定后端从 backend/ 目录启动
-const configDir = path.resolve(process.cwd(), '../config');
-const configFile = path.join(configDir, 'config.json');
+const configDir = path.resolve(process.cwd(), "../config");
+const configFile = path.join(configDir, "config.json");
 
 interface DBData extends PersistedConfig {}
 
@@ -25,18 +25,19 @@ export class ConfigManager {
     return {
       servers: [],
       events: [],
+      templates: [],
       systemSettings: this.getDefaultSystemSettings(),
       windowConfig: this.getDefaultWindowConfig(),
-      version: '1.0.0',
+      version: "1.0.0",
       exportedAt: new Date().toISOString(),
     };
   }
 
   private getDefaultSystemSettings(): SystemSettings {
     return {
-      id: 'system',
+      id: "system",
       heartbeat: { enabled: true, pingInterval: 30000, pongTimeout: 90000 },
-      wss: { enabled: false, certPath: '', keyPath: '' },
+      wss: { enabled: false, certPath: "", keyPath: "" },
       ipAccess: { whitelist: [], blacklist: [] },
       autoStart: false,
       startMinimized: false,
@@ -54,7 +55,7 @@ export class ConfigManager {
   private readData(): DBData {
     try {
       if (!fs.existsSync(configFile)) return this.getDefaultData();
-      const raw = fs.readFileSync(configFile, 'utf-8');
+      const raw = fs.readFileSync(configFile, "utf-8");
       const parsed = JSON.parse(raw) as DBData;
       return this.sanitizeData(parsed);
     } catch {
@@ -64,6 +65,7 @@ export class ConfigManager {
 
   /** 防御性修正：防止旧数据中越界/异常值污染运行时 */
   private sanitizeData(data: DBData): DBData {
+    if (!Array.isArray(data.templates)) data.templates = [];
     if (!data.systemSettings) return data;
 
     const s = data.systemSettings;
@@ -73,24 +75,28 @@ export class ConfigManager {
     if (s.heartbeat) {
       s.heartbeat.pingInterval = this.clamp(
         Number(s.heartbeat.pingInterval) || defaults.heartbeat.pingInterval,
-        5000, 300000,
+        5000,
+        300000
       );
       s.heartbeat.pongTimeout = this.clamp(
         Number(s.heartbeat.pongTimeout) || defaults.heartbeat.pongTimeout,
-        10000, 600000,
+        10000,
+        600000
       );
     }
 
     // 日志保留天数
     s.logRetentionDays = this.clamp(
       Number(s.logRetentionDays) || defaults.logRetentionDays,
-      1, 365,
+      1,
+      365
     );
 
     // 最大连接数
     s.maxConnectionsPerServer = this.clamp(
       Number(s.maxConnectionsPerServer) || defaults.maxConnectionsPerServer,
-      1, 10000,
+      1,
+      10000
     );
 
     return data;
@@ -105,7 +111,7 @@ export class ConfigManager {
     if (!fs.existsSync(configDir)) {
       fs.mkdirSync(configDir, { recursive: true });
     }
-    fs.writeFileSync(configFile, JSON.stringify(data, null, 2), 'utf-8');
+    fs.writeFileSync(configFile, JSON.stringify(data, null, 2), "utf-8");
   }
 
   // ==================== 初始化 ====================
@@ -158,24 +164,33 @@ export class ConfigManager {
     // 确保数值字段为 number 类型且在合法范围内
     data.systemSettings = {
       ...settings,
-      heartbeat: settings.heartbeat ? {
-        enabled: settings.heartbeat.enabled,
-        pingInterval: this.clamp(
-          Number(settings.heartbeat.pingInterval) || defaults.heartbeat.pingInterval,
-          5000, 300000,
-        ),
-        pongTimeout: this.clamp(
-          Number(settings.heartbeat.pongTimeout) || defaults.heartbeat.pongTimeout,
-          10000, 600000,
-        ),
-      } : settings.heartbeat,
+      heartbeat: settings.heartbeat
+        ? {
+            enabled: settings.heartbeat.enabled,
+            pingInterval: this.clamp(
+              Number(settings.heartbeat.pingInterval) ||
+                defaults.heartbeat.pingInterval,
+              5000,
+              300000
+            ),
+            pongTimeout: this.clamp(
+              Number(settings.heartbeat.pongTimeout) ||
+                defaults.heartbeat.pongTimeout,
+              10000,
+              600000
+            ),
+          }
+        : settings.heartbeat,
       logRetentionDays: this.clamp(
         Number(settings.logRetentionDays) || defaults.logRetentionDays,
-        1, 365,
+        1,
+        365
       ),
       maxConnectionsPerServer: this.clamp(
-        Number(settings.maxConnectionsPerServer) || defaults.maxConnectionsPerServer,
-        1, 10000,
+        Number(settings.maxConnectionsPerServer) ||
+          defaults.maxConnectionsPerServer,
+        1,
+        10000
       ),
       updatedAt: new Date().toISOString(),
     };
@@ -203,6 +218,7 @@ export class ConfigManager {
     return {
       servers: data.servers,
       events: data.events,
+      templates: data.templates ?? [],
       systemSettings: data.systemSettings,
       windowConfig: data.windowConfig,
       version: data.version,
@@ -214,6 +230,7 @@ export class ConfigManager {
     const data = this.readData();
     data.servers = config.servers;
     data.events = config.events;
+    data.templates = config.templates ?? [];
     data.systemSettings = config.systemSettings;
     data.windowConfig = config.windowConfig;
     data.version = config.version;
