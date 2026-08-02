@@ -10,17 +10,8 @@ pub enum BackendError {
     #[error("server not found")]
     ServerNotFound,
 
-    #[error("server is running")]
-    ServerRunning,
-
-    #[error("event not found")]
-    EventNotFound,
-
     #[error("transport not found")]
     TransportNotFound,
-
-    #[error("route not found")]
-    RouteNotFound,
 
     #[error("internal error: {0}")]
     Internal(String),
@@ -37,10 +28,7 @@ impl BackendError {
     pub fn error_code(&self) -> &'static str {
         match self {
             BackendError::ServerNotFound => "SERVER_NOT_FOUND",
-            BackendError::ServerRunning => "SERVER_RUNNING",
-            BackendError::EventNotFound => "EVENT_NOT_FOUND",
             BackendError::TransportNotFound => "TRANSPORT_NOT_FOUND",
-            BackendError::RouteNotFound => "ROUTE_NOT_FOUND",
             BackendError::Internal(_) => "INTERNAL_ERROR",
             BackendError::Config(_) => "CONFIG_ERROR",
             BackendError::Io(_) => "INTERNAL_ERROR",
@@ -51,10 +39,7 @@ impl BackendError {
     pub fn status_code(&self) -> u16 {
         match self {
             BackendError::ServerNotFound => 404,
-            BackendError::ServerRunning => 400,
-            BackendError::EventNotFound => 404,
             BackendError::TransportNotFound => 400,
-            BackendError::RouteNotFound => 404,
             BackendError::Config(_) => 400,
             BackendError::Internal(_) | BackendError::Io(_) => 500,
         }

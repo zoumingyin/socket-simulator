@@ -91,10 +91,6 @@ impl ConfigManager {
         self.data.lock().unwrap().events.clone()
     }
 
-    pub fn get_templates(&self) -> Vec<MessageTemplate> {
-        self.data.lock().unwrap().templates.clone()
-    }
-
     pub fn get_system_settings(&self) -> SystemSettings {
         self.data.lock().unwrap().system_settings.clone()
     }
@@ -115,38 +111,6 @@ impl ConfigManager {
 
     pub fn save_events(&self, events: Vec<EventConfig>) {
         self.update(|d| d.events = events);
-    }
-
-    pub fn save_templates(&self, templates: Vec<MessageTemplate>) {
-        self.update(|d| d.templates = templates);
-    }
-
-    pub fn add_template(&self, template: MessageTemplate) -> MessageTemplate {
-        self.update(|d| {
-            d.templates.push(template.clone());
-        });
-        template
-    }
-
-    pub fn update_template(&self, template: MessageTemplate) -> Option<MessageTemplate> {
-        let mut found = None;
-        self.update(|d| {
-            if let Some(slot) = d.templates.iter_mut().find(|t| t.id == template.id) {
-                *slot = template.clone();
-                found = Some(template.clone());
-            }
-        });
-        found
-    }
-
-    pub fn remove_template(&self, id: &str) -> bool {
-        let mut removed = false;
-        self.update(|d| {
-            let before = d.templates.len();
-            d.templates.retain(|t| t.id != id);
-            removed = d.templates.len() < before;
-        });
-        removed
     }
 
     pub fn save_system_settings(&self, mut settings: SystemSettings) {

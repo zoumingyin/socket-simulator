@@ -15,5 +15,4 @@ pub mod transport;
 pub mod types;
 pub mod ws;
 
-pub use app::Backend;
 pub use app::run;

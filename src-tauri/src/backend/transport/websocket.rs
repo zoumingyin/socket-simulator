@@ -78,10 +78,6 @@ impl WsServer {
         }
     }
 
-    pub fn cfg(&self) -> &ServerConfig {
-        &self.cfg
-    }
-
     /// IP 黑白名单过滤（P1-3）
     fn allow_ip(&self, ip: &str) -> bool {
         let wl = &self.sys.ip_access.whitelist;
@@ -238,10 +234,6 @@ impl WsServer {
 
 #[async_trait::async_trait]
 impl Transport for WsServer {
-    fn protocol(&self) -> ProtocolType {
-        self.cfg.protocol
-    }
-
     async fn start(&self) -> Result<(), BackendError> {
         if self.running.load(Ordering::SeqCst) {
             return Ok(());
@@ -328,9 +320,6 @@ impl Transport for WsServer {
         Ok(())
     }
 
-    fn is_running(&self) -> bool {
-        self.running.load(Ordering::SeqCst)
-    }
 }
 
 /// 加载 TLS 证书，构造 TlsAcceptor；失败返回 None（调用方降级纯 WS）

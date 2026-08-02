@@ -207,20 +207,6 @@ pub struct ClientInfo {
     pub metadata: Option<serde_json::Value>,
 }
 
-/// 客户端分组
-#[derive(Debug, Clone, Serialize, Deserialize, Default)]
-#[serde(rename_all = "camelCase")]
-pub struct ClientGroup {
-    pub id: String,
-    pub name: String,
-    #[serde(rename = "type", default)]
-    pub group_type: ClientGroupType,
-    #[serde(default)]
-    pub client_ids: Vec<String>,
-    #[serde(default)]
-    pub created_at: String,
-}
-
 // ======================== 消息中心 ========================
 
 /// 消息类型
@@ -231,34 +217,6 @@ pub enum MessageType {
     Text,
     #[serde(rename = "json")]
     Json,
-}
-
-/// 消息目标类型
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
-pub enum MessageTargetType {
-    #[default]
-    #[serde(rename = "broadcast")]
-    Broadcast,
-    #[serde(rename = "client")]
-    Client,
-    #[serde(rename = "group")]
-    Group,
-}
-
-/// 发送消息请求
-#[derive(Debug, Clone, Serialize, Deserialize, Default)]
-#[serde(rename_all = "camelCase")]
-pub struct SendMessageRequest {
-    pub server_id: String,
-    #[serde(default)]
-    pub target_type: MessageTargetType,
-    pub target_id: Option<String>,
-    pub event: String,
-    #[serde(default)]
-    pub message_type: MessageType,
-    #[serde(default)]
-    pub content: String,
-    pub metadata: Option<serde_json::Value>,
 }
 
 /// 消息模板
@@ -308,32 +266,10 @@ pub struct LogEntry {
 pub struct LogFilter {
     pub server_id: Option<String>,
     pub level: Option<LogLevel>,
-    pub event: Option<String>,
-    pub client_id: Option<String>,
     pub keyword: Option<String>,
-    pub start_time: Option<String>,
-    pub end_time: Option<String>,
 }
 
 // ======================== 统计面板 ========================
-
-/// 实时统计（P2-2 占位类型，本期不聚合）
-#[derive(Debug, Clone, Serialize, Deserialize, Default)]
-#[serde(rename_all = "camelCase")]
-pub struct ServerStats {
-    pub server_id: String,
-    pub online_clients: u64,
-    pub total_connections: u64,
-    pub reconnect_count: u64,
-    pub sent_messages: u64,
-    pub received_messages: u64,
-    pub sent_bytes: u64,
-    pub received_bytes: u64,
-    pub total_bytes: u64,
-    pub send_rate: f64,
-    pub receive_rate: f64,
-    pub uptime: u64,
-}
 
 /// 心跳配置
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -427,33 +363,6 @@ impl Default for WindowConfig {
     }
 }
 
-// ======================== 压力测试（P2-1 仅占位类型） ========================
-
-#[derive(Debug, Clone, Serialize, Deserialize, Default)]
-#[serde(rename_all = "camelCase")]
-pub struct PressureTestConfig {
-    pub server_id: String,
-    pub concurrent_connections: u32,
-    pub message_interval: u32,
-    pub message_count: u32,
-    pub message_size: u32,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize, Default)]
-#[serde(rename_all = "camelCase")]
-pub struct PressureTestResult {
-    pub qps: f64,
-    pub tps: f64,
-    pub avg_latency: f64,
-    pub p95_latency: f64,
-    pub p99_latency: f64,
-    pub failure_rate: f64,
-    pub total_messages: u64,
-    pub successful_messages: u64,
-    pub failed_messages: u64,
-    pub duration: f64,
-}
-
 // ======================== REST API ========================
 
 /// API 标准响应（与现网 `{ success, data?, errorCode?, error?, message?, timestamp }` 对齐）
@@ -484,16 +393,6 @@ impl<T> ApiResponse<T> {
         }
     }
 
-    pub fn error(error_code: &str, error: String, message: Option<String>) -> ApiResponse<T> {
-        ApiResponse {
-            success: false,
-            data: None,
-            error_code: Some(error_code.to_string()),
-            error: Some(error),
-            message,
-            timestamp: now_rfc3339(),
-        }
-    }
 }
 
 impl<T: Default> Default for ApiResponse<T> {

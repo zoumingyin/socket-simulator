@@ -7,13 +7,9 @@ use async_trait::async_trait;
 use serde_json::Value;
 
 use crate::backend::error::BackendError;
-use crate::backend::types::ProtocolType;
 
 #[async_trait]
 pub trait Transport: Send + Sync {
-    /// 协议类型
-    fn protocol(&self) -> ProtocolType;
-
     /// 启动传输层（绑定监听并开始 accept loop）
     async fn start(&self) -> Result<(), BackendError>;
 
@@ -34,6 +30,4 @@ pub trait Transport: Send + Sync {
     /// 断开指定客户端
     async fn disconnect_client(&self, client_id: &str) -> Result<(), BackendError>;
 
-    /// 是否正在运行
-    fn is_running(&self) -> bool;
 }

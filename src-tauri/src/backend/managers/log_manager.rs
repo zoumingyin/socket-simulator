@@ -104,55 +104,6 @@ impl LogManager {
         self.entries.lock().unwrap().clear();
     }
 
-    /// 导出日志到 JSON 文件
-    pub fn export_to_file(&self, path: &std::path::Path) -> std::io::Result<()> {
-        let g = self.entries.lock().unwrap();
-        let json = serde_json::to_string_pretty(&*g)?;
-        if let Some(parent) = path.parent() {
-            let _ = std::fs::create_dir_all(parent);
-        }
-        std::fs::write(path, json)
-    }
-
-    /// 从文件导入日志（替换内存，截断到上限）
-    pub fn import_from_file(&self, path: &std::path::Path) -> std::io::Result<()> {
-        let raw = std::fs::read_to_string(path)?;
-        let imported: Vec<LogEntry> = serde_json::from_str(&raw).unwrap_or_default();
-        let mut g = self.entries.lock().unwrap();
-        *g = imported;
-        if g.len() > self.max_memory {
-            let overflow = g.len() - self.max_memory;
-            g.drain(0..overflow);
-        }
-        Ok(())
-    }
-
-    /// 清理超过 `days` 天的按日日志文件（P1-5）
-    pub async fn cleanup_old(&self, days: u64) {
-        let log_dir = self.log_dir.clone();
-        let _ = tauri::async_runtime::spawn_blocking(move || {
-            let Ok(entries) = std::fs::read_dir(&log_dir) else {
-                return;
-            };
-            let cutoff = chrono::Local::now().naive_local().date().and_hms_opt(0, 0, 0).unwrap()
-                - chrono::Days::new(days);
-            for entry in entries.flatten() {
-                let path = entry.path();
-                if path.extension().and_then(|e| e.to_str()) != Some("log") {
-                    continue;
-                }
-                let stem = path.file_stem().and_then(|s| s.to_str()).unwrap_or("");
-                if let Ok(file_date) = chrono::NaiveDate::parse_from_str(stem, "%Y-%m-%d") {
-                    if file_date < cutoff.date() {
-                        let _ = std::fs::remove_file(&path);
-                        println!("[LogManager] 已清理过期日志: {}", path.display());
-                    }
-                }
-            }
-        })
-        .await;
-    }
-
     // ==================== 内部方法 ====================
 
     fn write_to_file(&self, entry: &LogEntry) {

@@ -258,11 +258,6 @@ impl ServiceManager {
         self.runtimes.lock().unwrap().clone()
     }
 
-    /// 单个运行时
-    pub fn get_runtime(&self, id: &str) -> Option<ServerRuntime> {
-        self.runtimes.lock().unwrap().get(id).cloned()
-    }
-
     /// 累加发送消息数并广播运行时
     pub fn increment_sent_messages(&self, id: &str) {
         {
@@ -284,21 +279,6 @@ impl ServiceManager {
         let server = self.servers.lock().unwrap().get(server_id).cloned();
         match server {
             Some(s) => s.broadcast(event, data, None).await,
-            None => Err(BackendError::TransportNotFound),
-        }
-    }
-
-    /// 向某个服务的指定客户端发送消息
-    pub async fn send(
-        &self,
-        server_id: &str,
-        client_id: &str,
-        event: &str,
-        data: serde_json::Value,
-    ) -> Result<(), BackendError> {
-        let server = self.servers.lock().unwrap().get(server_id).cloned();
-        match server {
-            Some(s) => s.send(client_id, event, data).await,
             None => Err(BackendError::TransportNotFound),
         }
     }
@@ -367,7 +347,7 @@ mod tests {
     use crate::backend::managers::client_manager::ClientManager;
     use crate::backend::managers::config_manager::ConfigManager;
     use crate::backend::managers::log_manager::LogManager;
-    use crate::backend::transport::{TransportHooks, WsServer};
+    use crate::backend::transport::websocket::{TransportHooks, WsServer};
     use crate::backend::types::*;
 
     fn tmp_dir() -> std::path::PathBuf {

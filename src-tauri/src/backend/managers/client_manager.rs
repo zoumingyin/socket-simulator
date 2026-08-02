@@ -51,22 +51,12 @@ impl ClientManager {
         }
     }
 
-    /// 指定服务的在线数量
-    pub fn count(&self, server_id: &str) -> usize {
-        self.clients
-            .lock()
-            .unwrap()
-            .values()
-            .filter(|c| c.server_id == server_id)
-            .count()
-    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::backend::constants::CLIENT_ID_SEP;
-    use crate::backend::types::*;
 
     fn make_client(server_id: &str, id: &str) -> ClientInfo {
         ClientInfo {
@@ -87,7 +77,7 @@ mod tests {
         assert_eq!(list.len(), 1);
         assert_eq!(list[0].id, "c1");
         assert_eq!(list[0].server_id, "s1");
-        assert_eq!(m.count("s1"), 1);
+        assert_eq!(m.get_clients(Some("s1")).len(), 1);
     }
 
     #[test]
@@ -96,8 +86,8 @@ mod tests {
         m.add(make_client("s1", "shared"));
         m.add(make_client("s2", "shared"));
         assert_eq!(m.list().len(), 2, "two servers keep distinct composite keys");
-        assert_eq!(m.count("s1"), 1);
-        assert_eq!(m.count("s2"), 1);
+        assert_eq!(m.get_clients(Some("s1")).len(), 1);
+        assert_eq!(m.get_clients(Some("s2")).len(), 1);
         // composite key separator is the documented "___"
         assert_eq!(CLIENT_ID_SEP, "___");
         let s1 = m.get_clients(Some("s1"));
@@ -111,7 +101,7 @@ mod tests {
         m.add(make_client("s1", "a"));
         m.add(make_client("s1", "a"));
         assert_eq!(m.list().len(), 1, "same serverId___id overwrites one entry");
-        assert_eq!(m.count("s1"), 1);
+        assert_eq!(m.get_clients(Some("s1")).len(), 1);
     }
 
     #[test]
@@ -130,7 +120,7 @@ mod tests {
         m.add(make_client("s1", "c1"));
         m.remove("s1", "c1");
         assert_eq!(m.list().len(), 0);
-        assert_eq!(m.count("s1"), 0);
+        assert_eq!(m.get_clients(Some("s1")).len(), 0);
         m.remove("s1", "c1");
         assert_eq!(m.list().len(), 0, "removing again is a no-op");
     }

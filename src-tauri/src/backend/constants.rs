@@ -12,9 +12,6 @@ pub const ADMIN_WS_PATH: &str = "/admin/ws";
 /// 心跳：后端每多少毫秒推送一次 `heartbeat`
 pub const HEARTBEAT_INTERVAL_MS: u64 = 10_000;
 
-/// 僵尸连接清理检查间隔
-pub const ZOMBIE_CHECK_INTERVAL_MS: u64 = 15_000;
-
 /// 超过该毫秒数未收到 `heartbeat_ack` 即清理管理连接
 pub const HEARTBEAT_TIMEOUT_MS: u64 = 30_000;
 

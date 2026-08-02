@@ -27,9 +27,6 @@ pub struct Backend {
     pub events: Arc<EventManager>,
     pub services: Arc<ServiceManager>,
     pub event_bus: EventBus,
-    /// Tauri AppHandle。运行时路径（`run` / admin WS）并不读取此字段；
-    /// 改为 `Option` 以便测试在无 `AppHandle` 环境下构造 `Backend`。
-    pub app: Option<AppHandle>,
 }
 
 impl Backend {
@@ -63,7 +60,6 @@ impl Backend {
             events,
             services,
             event_bus,
-            app: Some(app),
         }
     }
 
@@ -96,7 +92,6 @@ impl Backend {
             events,
             services,
             event_bus,
-            app: None,
         }
     }
 
