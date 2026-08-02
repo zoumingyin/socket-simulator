@@ -156,6 +156,12 @@ fn main() {
             // 获取 Tauri 自动创建的窗口（根据 tauri.conf.json 的 app.windows 配置）
             let window = app.get_webview_window("main").unwrap();
 
+            // 显式设置窗口图标，确保 Windows 任务栏显示应用图标
+            // （Tauri 2 的 generate_context 默认图标不一定会应用到窗口任务栏条目）
+            if let Some(icon) = app.default_window_icon() {
+                let _ = window.set_icon(icon.clone());
+            }
+
             // 根据配置决定是否显示窗口
             let start_minimized = should_start_minimized(app.handle());
             println!("[main] startMinimized = {}", start_minimized);
