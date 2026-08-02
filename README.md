@@ -34,7 +34,7 @@
 ```mermaid
 flowchart LR
   subgraph Desktop["Tauri 桌面应用 / 浏览器"]
-    UI["React 前端\n:5173 / dist"]
+    UI["React 前端\n:4173 / dist"]
     ASM["AdminSocketManager"]
   end
   subgraph Backend["Node 后端 :3080"]
@@ -112,7 +112,7 @@ cd backend && npm install && cd ..
 | 变量 | 说明 | 默认值 |
 |------|------|--------|
 | `API_PORT` | 后端 API 端口 | `3080` |
-| `ALLOWED_ORIGIN` | CORS 允许来源 | `http://localhost:5173` |
+| `ALLOWED_ORIGIN` | CORS 允许来源 | `http://localhost:4173` |
 | `VITE_API_BASE` | 前端 REST 地址 | `http://localhost:3080` |
 | `VITE_ADMIN_SOCKET_PATH` | 管理 Socket.IO 路径 | `/admin/socket.io` |
 
@@ -121,7 +121,7 @@ cd backend && npm install && cd ..
 **方式 A — 一键启动（推荐）**
 
 ```bash
-# 同时启动前端 (:5173) 与后端 (:3080)
+# 同时启动前端 (:4173) 与后端 (:3080)
 npm run dev:all
 ```
 
@@ -142,7 +142,7 @@ npm run dev          # tsx watch main.ts
 npm run dev
 ```
 
-浏览器访问 [http://localhost:5173](http://localhost:5173)。请确保后端已启动，否则页面 API 调用与管理通道连接会失败。
+浏览器访问 [http://localhost:4173](http://localhost:4173)。请确保后端已启动，否则页面 API 调用与管理通道连接会失败。
 
 ### 4. Tauri 桌面开发（可选）
 
@@ -286,7 +286,7 @@ node test-admin-socket.mjs
 检查浏览器控制台是否有 Socket.IO 连接错误；确认 `ALLOWED_ORIGIN` 与前端访问地址一致。
 
 **Tauri 开发白屏**  
-确认 `npm run dev:all` 或 `npm run dev` 已在 5173 端口运行，并与 `tauri.conf.json` 中 `devUrl` 一致。
+确认 `npm run dev:all` 或 `npm run dev` 已在 4173 端口运行，并与 `tauri.conf.json` 中 `devUrl` 一致。
 
 **配置未生效**  
 检查实际读取的是根目录 `config/config.json` 还是 `backend/config/config.json`，避免改错文件。

@@ -10,7 +10,7 @@ pub const DEFAULT_API_PORT: u16 = 3080;
 pub const ADMIN_WS_PATH: &str = "/admin/ws";
 
 /// 开发期前端默认来源（CORS）
-pub const DEFAULT_ALLOWED_ORIGIN: &str = "http://localhost:5173";
+pub const DEFAULT_ALLOWED_ORIGIN: &str = "http://localhost:4173";
 
 /// Tauri 前端 webview 来源（release 下）
 pub const TAURI_ORIGIN: &str = "tauri://localhost";
