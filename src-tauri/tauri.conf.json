@@ -4,8 +4,14 @@
   "version": "1.0.0",
   "identifier": "com.socket-service-manager",
   "build": {
-    "beforeDevCommand": "npm run dev",
-    "beforeBuildCommand": "npm run build",
+    "beforeDevCommand": {
+      "script": "node node_modules/vite/bin/vite.js",
+      "cwd": ".."
+    },
+    "beforeBuildCommand": {
+      "script": "node node_modules/typescript/bin/tsc && node node_modules/vite/bin/vite.js build",
+      "cwd": ".."
+    },
     "devUrl": "http://localhost:4173",
     "frontendDist": "../dist"
   },
