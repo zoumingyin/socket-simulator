@@ -4,8 +4,8 @@
   "version": "1.0.0",
   "identifier": "com.socket-service-manager",
   "build": {
-    "beforeDevCommand": "npm run dev:all",
-    "beforeBuildCommand": "",
+    "beforeDevCommand": "npm run dev",
+    "beforeBuildCommand": "npm run build",
     "devUrl": "http://localhost:5173",
     "frontendDist": "../dist"
   },

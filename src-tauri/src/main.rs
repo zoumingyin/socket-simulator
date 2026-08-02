@@ -1,17 +1,22 @@
 // Prevents additional console window on Windows in release, DO NOT REMOVE!!
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
+mod backend;
+
 use std::fs::File;
 use std::io::Read;
-use std::path::PathBuf;
+
 use serde_json::Value;
 use tauri::{
-    App, AppHandle, Emitter, Manager, Runtime,
+    AppHandle, Emitter, Manager, Runtime,
     menu::{Menu, MenuItem, PredefinedMenuItem},
     tray::TrayIconBuilder,
     image::Image,
     WindowEvent,
 };
+
+use crate::backend::app::Backend;
+use crate::backend::run as run_backend;
 
 const MENU_SHOW: &str = "show";
 const MENU_START_ALL: &str = "start_all";
@@ -19,29 +24,25 @@ const MENU_STOP_ALL: &str = "stop_all";
 const MENU_RESTART_ALL: &str = "restart_all";
 const MENU_QUIT: &str = "quit";
 
-/// 从配置文件读取 startMinimized 配置
-fn should_start_minimized() -> bool {
-    let paths = vec![
-        PathBuf::from("../config/config.json"),
-        PathBuf::from("../../config/config.json"),
-        PathBuf::from("config/config.json"),
-    ];
-
-    for path in &paths {
-        if let Ok(mut file) = File::open(path) {
-            let mut contents = String::new();
-            if file.read_to_string(&mut contents).is_ok() {
-                if let Ok(json) = serde_json::from_str::<Value>(&contents) {
-                    if let Some(system) = json.get("systemSettings") {
-                        if let Some(minimized) = system.get("startMinimized") {
-                            return minimized.as_bool().unwrap_or(false);
-                        }
+/// 从 app_data_dir 下的 config/config.json 读取 startMinimized 配置
+fn should_start_minimized(app: &AppHandle) -> bool {
+    let dir = match app.path().app_data_dir() {
+        Ok(d) => d,
+        Err(_) => return false,
+    };
+    let path = dir.join("config").join("config.json");
+    if let Ok(mut file) = File::open(path) {
+        let mut contents = String::new();
+        if file.read_to_string(&mut contents).is_ok() {
+            if let Ok(json) = serde_json::from_str::<Value>(&contents) {
+                if let Some(system) = json.get("systemSettings") {
+                    if let Some(minimized) = system.get("startMinimized") {
+                        return minimized.as_bool().unwrap_or(false);
                     }
                 }
             }
         }
     }
-
     false
 }
 
@@ -57,41 +58,12 @@ fn show_main_window<R: Runtime>(app: &AppHandle<R>) {
 
 /// 创建托盘菜单
 fn create_tray_menu<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Menu<R>> {
-    let show_item = MenuItem::with_id(
-        app,
-        MENU_SHOW,
-        "显示主界面",
-        true,
-        None::<&str>,
-    )?;
-    let start_item = MenuItem::with_id(
-        app,
-        MENU_START_ALL,
-        "启动全部服务",
-        true,
-        None::<&str>,
-    )?;
-    let stop_item = MenuItem::with_id(
-        app,
-        MENU_STOP_ALL,
-        "停止全部服务",
-        true,
-        None::<&str>,
-    )?;
-    let restart_item = MenuItem::with_id(
-        app,
-        MENU_RESTART_ALL,
-        "重启全部服务",
-        true,
-        None::<&str>,
-    )?;
-    let quit_item = MenuItem::with_id(
-        app,
-        MENU_QUIT,
-        "退出",
-        true,
-        None::<&str>,
-    )?;
+    let show_item = MenuItem::with_id(app, MENU_SHOW, "显示主界面", true, None::<&str>)?;
+    let start_item = MenuItem::with_id(app, MENU_START_ALL, "启动全部服务", true, None::<&str>)?;
+    let stop_item = MenuItem::with_id(app, MENU_STOP_ALL, "停止全部服务", true, None::<&str>)?;
+    let restart_item =
+        MenuItem::with_id(app, MENU_RESTART_ALL, "重启全部服务", true, None::<&str>)?;
+    let quit_item = MenuItem::with_id(app, MENU_QUIT, "退出", true, None::<&str>)?;
     let separator = PredefinedMenuItem::separator(app)?;
 
     Menu::with_items(app, &[
@@ -105,11 +77,10 @@ fn create_tray_menu<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Menu<R>> {
 }
 
 /// 设置托盘
-fn setup_tray(app: &App) -> tauri::Result<()> {
+fn setup_tray(app: &tauri::App) -> tauri::Result<()> {
     let app_handle = app.handle().clone();
     let tray_menu = create_tray_menu(&app_handle)?;
 
-    // 加载图标 - 尝试多个路径
     let icon_paths = vec![
         "icons/icon.png",
         "../icons/icon.png",
@@ -126,7 +97,6 @@ fn setup_tray(app: &App) -> tauri::Result<()> {
                     show_main_window(app);
                 }
                 MENU_START_ALL => {
-                    // 通过事件通知前端启动全部服务
                     let _ = app.emit("tray-start-all", "start-all");
                 }
                 MENU_STOP_ALL => {
@@ -136,14 +106,17 @@ fn setup_tray(app: &App) -> tauri::Result<()> {
                     let _ = app.emit("tray-restart-all", "restart-all");
                 }
                 MENU_QUIT => {
-                    // 真正退出应用
+                    // 退出前优雅关闭后端（停止全部服务，事件轮询随进程退出结束）
+                    if let Some(backend) = app.try_state::<Backend>() {
+                        let b = backend.inner().clone();
+                        tauri::async_runtime::spawn(async move { b.shutdown().await; });
+                    }
                     app.exit(0);
                 }
                 _ => {}
             }
         });
 
-    // 设置图标
     let mut icon_loaded = false;
     for icon_path in &icon_paths {
         match Image::from_path(icon_path) {
@@ -176,18 +149,16 @@ fn open_devtools(app: AppHandle) {
 }
 
 fn main() {
-    // 检查是否应该启动时最小化
-    let start_minimized = should_start_minimized();
-    println!("[main] startMinimized = {}", start_minimized);
-
     tauri::Builder::default()
         .plugin(tauri_plugin_shell::init())
         .invoke_handler(tauri::generate_handler![open_devtools])
-        .setup(move |app| {
+        .setup(|app| {
             // 获取 Tauri 自动创建的窗口（根据 tauri.conf.json 的 app.windows 配置）
             let window = app.get_webview_window("main").unwrap();
 
             // 根据配置决定是否显示窗口
+            let start_minimized = should_start_minimized(app.handle());
+            println!("[main] startMinimized = {}", start_minimized);
             if start_minimized {
                 println!("[main] 启动时最小化到托盘");
                 let _ = window.hide();
@@ -200,12 +171,16 @@ fn main() {
             // 设置托盘
             setup_tray(app)?;
 
+            // ===== 启动 Rust 后端（集成进 Tauri，不再需要 Node sidecar） =====
+            let backend = Backend::new(app.handle().clone());
+            app.manage(backend.clone());
+            tauri::async_runtime::spawn(run_backend(backend));
+
             Ok(())
         })
         .on_window_event(|window, event| {
             match event {
                 WindowEvent::CloseRequested { api, .. } => {
-                    // 拦截关闭请求，改为隐藏到托盘
                     api.prevent_close();
                     println!("[main] 窗口关闭请求被拦截，隐藏到托盘");
                     let _ = window.hide();
