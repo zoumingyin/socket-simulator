@@ -22,7 +22,7 @@ use super::log_manager::LogManager;
 
 /// 服务管理器
 pub struct ServiceManager {
-    config: Arc<ConfigManager>,
+    pub(crate) config: Arc<ConfigManager>,
     logs: Arc<LogManager>,
     clients: Arc<ClientManager>,
     event_bus: EventBus,

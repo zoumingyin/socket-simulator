@@ -163,7 +163,7 @@ impl Transport for SocketIoServer {
                     let builder = hyper_util::server::conn::auto::Builder::new(
                         hyper_util::rt::TokioExecutor::new(),
                     );
-                    if let Err(e) = builder.serve_connection(io, conn_svc).await {
+                    if let Err(e) = builder.serve_connection_with_upgrades(io, conn_svc).await {
                         eprintln!("[SocketIoServer] 连接处理错误: {}", e);
                     }
                 });

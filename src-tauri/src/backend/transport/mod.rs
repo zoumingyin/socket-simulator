@@ -4,5 +4,4 @@ pub mod transport;
 pub mod websocket;
 pub mod socketio;
 
-pub use socketio::SocketIoServer;
 pub use transport::Transport;
