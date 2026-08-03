@@ -83,6 +83,7 @@ pub(crate) struct ClientDisconnect {
 }
 
 #[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub(crate) struct SendBody {
     server_id: Option<String>,
     target_type: Option<String>,
@@ -377,4 +378,34 @@ pub async fn import_config(State(b): State<AppState>, Json(body): Json<Persisted
     b.config.import_all(body.clone());
     b.events.load_events(body.events.clone());
     ok_msg_only("导入成功")
+}
+
+#[cfg(test)]
+mod tests {
+    use super::SendBody;
+    use serde_json::json;
+
+    /// 回归：消息中心前端按 camelCase 发送（serverId/targetType/targetId/messageType），
+    /// SendBody 必须能正确反序列化。修复前缺少 #[serde(rename_all = "camelCase")]，
+    /// 导致 serverId 等字段全部丢失 → send_via 取不到 server_id → 返回 SERVER_NOT_FOUND，
+    /// 消息中心的广播 / 指定客户端发送全部失效。
+    #[test]
+    fn send_body_deserializes_camel_case() {
+        let body = json!({
+            "serverId": "srv-1",
+            "targetType": "client",
+            "targetId": "abc",
+            "event": "myEvent",
+            "messageType": "json",
+            "content": "{\"msg\":\"hi\"}"
+        });
+        let parsed: SendBody =
+            serde_json::from_value(body).expect("SendBody 应能从 camelCase 请求体反序列化");
+        assert_eq!(parsed.server_id.as_deref(), Some("srv-1"));
+        assert_eq!(parsed.target_type.as_deref(), Some("client"));
+        assert_eq!(parsed.target_id.as_deref(), Some("abc"));
+        assert_eq!(parsed.event, "myEvent");
+        assert_eq!(parsed.message_type.as_deref(), Some("json"));
+        assert_eq!(parsed.content.as_deref(), Some("{\"msg\":\"hi\"}"));
+    }
 }
