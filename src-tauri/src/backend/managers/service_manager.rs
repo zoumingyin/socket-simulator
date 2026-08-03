@@ -11,6 +11,7 @@ use std::time::Duration;
 use crate::backend::constants::*;
 use crate::backend::error::BackendError;
 use crate::backend::eventbus::EventBus;
+use crate::backend::transport::socketio::SocketIoServer;
 use crate::backend::transport::websocket::{TransportHooks, WsServer};
 use crate::backend::transport::Transport;
 use crate::backend::types::*;
@@ -25,8 +26,8 @@ pub struct ServiceManager {
     logs: Arc<LogManager>,
     clients: Arc<ClientManager>,
     event_bus: EventBus,
-    /// serverId -> 运行中的传输层实例
-    servers: Arc<Mutex<HashMap<String, Arc<WsServer>>>>,
+    /// serverId -> 运行中的传输层实例（按协议可能为 WsServer 或 SocketIoServer）
+    servers: Arc<Mutex<HashMap<String, Arc<dyn Transport>>>>,
     /// serverId -> 运行时快照
     runtimes: Arc<Mutex<HashMap<String, ServerRuntime>>>,
 }
@@ -180,10 +181,21 @@ impl ServiceManager {
             }),
         };
 
-        let ws: Arc<WsServer> = Arc::new_cyclic(|weak| WsServer::new(cfg, sys, hooks, weak.clone()));
-        ws.start().await?;
+        let protocol = cfg.protocol;
+        let transport: Arc<dyn Transport> = match protocol {
+            ProtocolType::Websocket => {
+                let ws = Arc::new_cyclic(|weak| WsServer::new(cfg, sys, hooks, weak.clone()));
+                ws.start().await?;
+                ws as Arc<dyn Transport>
+            }
+            ProtocolType::SocketIo => {
+                let sio = Arc::new(SocketIoServer::new(cfg, sys, hooks));
+                sio.start().await?;
+                sio as Arc<dyn Transport>
+            }
+        };
 
-        self.servers.lock().unwrap().insert(id.clone(), ws);
+        self.servers.lock().unwrap().insert(id.clone(), transport);
         {
             let mut r = self.runtimes.lock().unwrap();
             let rt = r
@@ -348,6 +360,7 @@ mod tests {
     use crate::backend::managers::config_manager::ConfigManager;
     use crate::backend::managers::log_manager::LogManager;
     use crate::backend::transport::websocket::{TransportHooks, WsServer};
+    use crate::backend::transport::Transport;
     use crate::backend::types::*;
 
     fn tmp_dir() -> std::path::PathBuf {
@@ -417,7 +430,7 @@ mod tests {
                 weak.clone(),
             )
         });
-        sm.servers.lock().unwrap().insert("live".to_string(), ws);
+        sm.servers.lock().unwrap().insert("live".to_string(), ws as Arc<dyn Transport>);
         assert!(
             !sm.remove_server("live"),
             "remove_server must refuse while the transport is present"
