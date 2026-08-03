@@ -140,6 +140,7 @@ pub enum EventStatus {
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 #[serde(rename_all = "camelCase")]
 pub struct EventConfig {
+    #[serde(default)]
     pub id: String,
     pub server_id: String,
     pub name: String,

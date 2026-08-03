@@ -165,6 +165,34 @@ mod tests {
         assert_eq!(em.config.get_events().len(), 1);
     }
 
+    /// 回归：/api/events/add 的 JSON 请求体不含 `id`（前端 addEvent 用
+    /// Omit<EventConfig,'id'|'createdAt'|'updatedAt'> 发送），必须能反序列化成功，
+    /// 反序列化后 id 为空，交由 add_event 自动补全。
+    #[test]
+    fn event_config_deserializes_without_id() {
+        let body = r#"{
+            "serverId": "9-nYx6OYZdEFGUAnL5-Ny",
+            "name": "qw",
+            "status": "enabled",
+            "pollingEnabled": false,
+            "pollingInterval": 10
+        }"#;
+        let parsed: EventConfig = serde_json::from_str(body)
+            .expect("EventConfig 应能在缺少 id 时反序列化（回归：missing field `id` 错误）");
+        assert!(parsed.id.is_empty(), "omit id 后应留空，由 add_event 补全");
+        assert_eq!(parsed.server_id, "9-nYx6OYZdEFGUAnL5-Ny");
+        assert_eq!(parsed.name, "qw");
+        assert_eq!(parsed.status, EventStatus::Enabled);
+        assert!(!parsed.polling_enabled);
+        assert_eq!(parsed.polling_interval, Some(10));
+
+        // 走真实 add_event 路径，确认最终被补全并落盘
+        let em = setup();
+        let saved = em.add_event(parsed);
+        assert!(!saved.id.is_empty(), "add_event 必须补全 id");
+        assert_eq!(em.config.get_events().len(), 1);
+    }
+
     #[test]
     fn toggle_event_flips_enabled_flag() {
         let em = setup();
