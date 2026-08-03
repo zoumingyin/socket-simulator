@@ -42,6 +42,19 @@ Thumbs.db
 __pycache__/
 *.pyc
 
+# Alternate / debug cargo target dirs (临时排查用，非产物目录)
+src-tauri/target-fresh/
+src-tauri/target-verify/
+
+# Release / build archives (发布包不入库)
+*.zip
+
+# 临时/统计工具产生的散落文件（非项目产物，不入库）
+_gs.txt
+gs*.txt
+git_*.txt
+logs/
+
 # Tauri
 src-tauri/gen/
 .workbuddy
