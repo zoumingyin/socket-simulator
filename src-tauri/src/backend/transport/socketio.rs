@@ -3,11 +3,10 @@
 //! 基于 `socketioxide` 0.18（hyper 1.0 / http 1.0，兼容官方 JS 客户端 v3+）。每个
 //! `ServerConfig` 独立 `TcpListener` 做 accept loop，把每个连接升级为 Socket.IO 会话。
 //!
-//! 注意：项目 REST/管理端使用的是 `axum` 0.7（底层 http 0.2 / hyper 0.14），而
-//! `socketioxide` 0.18 要求 http 1.0 / hyper 1.9，二者 `Layer`/`Service` 的 `Request`
-//! 类型（`http::Request`）版本不兼容，无法用 `axum::Router().layer(layer)` 组合。因此这里
-//! 直接驱动 `socketioxide` 原生暴露的 `hyper` 1.0 服务（`SocketIoService`），配合 `hyper-util`
-//! 的 `TokioIo` / `TokioExecutor` 做连接级 serve，避免引入对既有 axum 0.7 栈的改动。
+//! 受管 Socket.IO 服务使用**独立端口**（与管理端 3080 隔离），因此不挂到既有 `axum` 0.7
+//! 的 REST/admin 路由上，而是直接用 `hyper-util` 驱动 `socketioxide` 原生暴露的 `hyper` 1.0
+//! 服务（`SocketIoService`），配合 `hyper-util` 的 `TokioIo` / `TokioExecutor` 做连接级
+//! serve。这样与既有 axum 0.7 REST/admin 栈互不干扰、各自独立运行。
 
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -20,6 +19,10 @@ use socketioxide::socket::DisconnectReason;
 use socketioxide::SocketIo;
 use tokio::net::TcpListener;
 use tokio::task::AbortHandle;
+use tower::Layer;
+use tower_http::cors::CorsLayer;
+
+use hyper_util::service::TowerToHyperService;
 
 use crate::backend::constants::*;
 use crate::backend::error::BackendError;
@@ -148,7 +151,13 @@ impl Transport for SocketIoServer {
                         continue;
                     }
                 };
-                let conn_svc = service.clone();
+                // 用 permissive CORS 包裹每层连接服务，确保浏览器客户端（含本应用 React
+                // 前端及外部浏览器客户端）的 HTTP 轮询握手不被跨域拦截；
+                // CorsLayer 产出的是 tower::Service，需用 TowerToHyperService 桥接成
+                // hyper::service::Service 才能交给 hyper-util 的 serve_connection
+                let conn_svc = TowerToHyperService::new(
+                    CorsLayer::permissive().layer(service.clone()),
+                );
                 tokio::spawn(async move {
                     let io = hyper_util::rt::TokioIo::new(stream);
                     let builder = hyper_util::server::conn::auto::Builder::new(

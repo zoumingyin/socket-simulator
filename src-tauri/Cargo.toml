@@ -25,8 +25,9 @@ tokio-tungstenite = "0.24"
 futures-util = "0.3"
 # 受管服务 Socket.IO 服务端（基于 hyper 1.0 / http 1.0，兼容官方 JS 客户端 v3+）
 socketioxide = "0.18"
-# 直接驱动 socketioxide 原生 hyper 1.0 服务（项目 REST 侧 axum 为 0.7/http 0.2，无法与之组合 layer）
-hyper-util = { version = "0.1", features = ["server-auto", "tokio"] }
+# 受管 Socket.IO 服务用独立端口（与管理端 3080 隔离），直接用 hyper-util 驱动
+# socketioxide 原生 hyper 1.0 服务（SocketIoService），与既有 axum 0.7 REST/admin 栈互不干扰
+hyper-util = { version = "0.1", features = ["server-auto", "tokio", "service"] }
 
 # 错误处理 / 诊断
 anyhow = "1"
