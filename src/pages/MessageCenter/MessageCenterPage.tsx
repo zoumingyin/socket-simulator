@@ -6,11 +6,11 @@
 import React, { useEffect, useState } from 'react';
 import {
   Card, Space, Typography, Radio, Input, Button, Select,
-  Switch, Divider, Tag,
+  Switch, Divider, Tag, List, Empty, Popconfirm,
   message,
 } from 'antd';
-import { SendOutlined, FormatPainterOutlined, CheckCircleOutlined, CompressOutlined } from '@ant-design/icons';
-import type { MessageType, SendMessageRequest, MessageTargetType } from '../../types/index.js';
+import { SendOutlined, FormatPainterOutlined, CheckCircleOutlined, CompressOutlined, SaveOutlined, DeleteOutlined } from '@ant-design/icons';
+import type { MessageType, SendMessageRequest, MessageTargetType, SavedMessage } from '../../types/index.js';
 import { useMessageStore } from '../../store/useMessageStore.js';
 import { useClientStore } from '../../store/useClientStore.js';
 import { useServerStore } from '../../store/useServerStore.js';
@@ -23,6 +23,7 @@ export function MessageCenterPage(): React.ReactElement {
   const [messageApi, contextHolder] = message.useMessage();
   const {
     sending, error, sendMessage, broadcast, formatJSON, validateJSON, minifyJSON,
+    savedMessages, saveMessage, deleteSavedMessage,
   } = useMessageStore();
   const { list: clients, fetchClients } = useClientStore();
   const { list: servers } = useServerStore();
@@ -66,6 +67,29 @@ export function MessageCenterPage(): React.ReactElement {
   const handleMinify = () => {
     const r = minifyJSON(content);
     if (r.ok) setContent(r.minified!); else messageApi.error(r.error);
+  };
+
+  /** 保存当前消息到本地（localStorage，持久化） */
+  const handleSave = () => {
+    if (!content.trim()) { messageApi.warning('消息内容为空，无法保存'); return; }
+    saveMessage({
+      content: content.trim(),
+      messageType,
+      event: event || undefined,
+      serverId,
+      targetType,
+    });
+    messageApi.success('已保存当前消息');
+  };
+
+  /** 点击已保存消息：将其内容自动填充到输入框及相关字段 */
+  const handleUseSaved = (m: SavedMessage) => {
+    setContent(m.content);
+    setMessageType(m.messageType);
+    if (m.event) setEvent(m.event);
+    if (m.serverId) setServerId(m.serverId);
+    if (m.targetType) setTargetType(m.targetType);
+    messageApi.success('已填入消息内容');
   };
 
   /** 过滤出当前选中服务下的已启用事件 */
@@ -180,9 +204,61 @@ export function MessageCenterPage(): React.ReactElement {
             />
           </div>
 
-          <Button type="primary" icon={<SendOutlined />} onClick={handleSend} loading={sending}>发送消息</Button>
+          <Space>
+            <Button type="primary" icon={<SendOutlined />} onClick={handleSend} loading={sending}>发送消息</Button>
+            <Button icon={<SaveOutlined />} onClick={handleSave}>保存当前消息</Button>
+          </Space>
           {error && <Text type="danger">{error}</Text>}
         </Space>
+      </Card>
+
+      <Card title="已保存消息" variant="outlined" style={{ marginBottom: 24 }}>
+        {savedMessages.length === 0 ? (
+          <Empty description="暂无保存的消息，可在上方编辑后点击「保存当前消息」" />
+        ) : (
+          <List
+            dataSource={savedMessages}
+            renderItem={(m) => (
+              <List.Item
+                actions={[
+                  <Button key="use" type="link" onClick={() => handleUseSaved(m)}>填入</Button>,
+                  <Popconfirm
+                    key="del"
+                    title="确认删除该消息？"
+                    onConfirm={() => deleteSavedMessage(m.id)}
+                    okText="删除"
+                    cancelText="取消"
+                  >
+                    <Button type="link" danger icon={<DeleteOutlined />}>删除</Button>
+                  </Popconfirm>,
+                ]}
+              >
+                <div
+                  style={{ cursor: 'pointer', flex: 1, minWidth: 0 }}
+                  onClick={() => handleUseSaved(m)}
+                  title="点击填入消息内容"
+                >
+                  <Space size={8}>
+                    <Tag color={m.messageType === 'json' ? 'blue' : 'default'}>{m.messageType.toUpperCase()}</Tag>
+                    <Text type="secondary" style={{ fontSize: 12 }}>
+                      {new Date(m.createdAt).toLocaleString()}
+                    </Text>
+                  </Space>
+                  <div style={{
+                    marginTop: 4,
+                    fontFamily: 'monospace',
+                    whiteSpace: 'nowrap',
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                  }}>
+                    {m.content}
+                  </div>
+                  {m.event && <Text type="secondary" style={{ fontSize: 12 }}>事件: {m.event}</Text>}
+                </div>
+              </List.Item>
+            )}
+          />
+        )}
       </Card>
     </div>
   );

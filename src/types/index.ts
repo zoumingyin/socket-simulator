@@ -123,6 +123,17 @@ export interface SendMessageRequest {
   metadata?: Record<string, unknown>;
 }
 
+/** 本地保存的消息（消息中心 /messages 持久化到 localStorage） */
+export interface SavedMessage {
+  id: string;
+  content: string;
+  messageType: MessageType;
+  event?: string;
+  serverId?: string;
+  targetType?: MessageTargetType;
+  createdAt: string;
+}
+
 
 // ======================== 日志系统 ========================
 
