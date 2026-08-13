@@ -1,8 +1,7 @@
 /**
- * MockComponents - Mock 服务共享组件
+ * MockComponents — Mock HTTP 规则编辑共享组件
  *
- * 被 ServerManagerPage 和 MockServicesPage 共同使用，避免重复代码。
- * 包含：JsonEditor、ConditionEditor、MockRuleModal、常量定义。
+ * 供服务管理「HTTP·Mock」区使用：JsonEditor、ConditionEditor、MockRuleModal、MockRulesTable。
  */
 import React, { useEffect, useMemo, useState } from 'react';
 import {

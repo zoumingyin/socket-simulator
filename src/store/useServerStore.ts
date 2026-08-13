@@ -83,15 +83,17 @@ export const useServerStore = create<ServerState>((set, get) => ({
   },
 
   async updateServer(id, patch) {
+    const current = get().list.find((srv) => srv.id === id);
+    if (!current) throw new Error('服务不存在');
+    const next: ServerConfig = { ...current, ...patch, id };
     const res = await apiFetch<ServerConfig>('/server/update', {
       method: 'POST',
-      body: JSON.stringify({ id, ...patch }),
+      body: JSON.stringify(next),
     });
-    if (res.data) {
-      set((s) => ({
-        list: s.list.map((srv) => (srv.id === id ? res.data! : srv)),
-      }));
-    }
+    const saved = res.data ?? next;
+    set((s) => ({
+      list: s.list.map((srv) => (srv.id === id ? saved : srv)),
+    }));
   },
 
   async removeServer(id) {

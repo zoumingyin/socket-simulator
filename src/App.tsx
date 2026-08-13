@@ -27,10 +27,8 @@ import {
   MessageOutlined,
   FileTextOutlined,
   SettingOutlined,
-  ApiOutlined,
 } from "@ant-design/icons";
 import zhCN from "antd/locale/zh_CN";
-import { useSettingsStore } from "./store/useSettingsStore.js";
 import { useThemeStore } from "./store/useThemeStore";
 import { DashboardPage } from "./pages/Dashboard/DashboardPage.jsx";
 import { ServerManagerPage } from "./pages/ServerManager/ServerManagerPage.jsx";
@@ -39,14 +37,12 @@ import { EventManagerPage } from "./pages/EventManager/EventManagerPage.jsx";
 import { MessageCenterPage } from "./pages/MessageCenter/MessageCenterPage.jsx";
 import { LogViewerPage } from "./pages/LogViewer/LogViewerPage.jsx";
 import { SettingsPage } from "./pages/Settings/SettingsPage.jsx";
-import { MockServicesPage } from "./pages/Mock/MockServicesPage.jsx";
 import { adminSocket } from "./socket/AdminSocketManager.js";
 import { apiFetch } from "./api/client.js";
 
 const menuItems = [
   { key: "/", icon: <DashboardOutlined />, label: "仪表盘" },
   { key: "/servers", icon: <CloudServerOutlined />, label: "服务管理" },
-  { key: "/mock", icon: <ApiOutlined />, label: "Mock 服务" },
   { key: "/clients", icon: <TeamOutlined />, label: "客户端管理" },
   { key: "/events", icon: <ThunderboltOutlined />, label: "事件管理" },
   { key: "/messages", icon: <MessageOutlined />, label: "消息中心" },
@@ -259,7 +255,6 @@ function AppLayout(): React.ReactElement {
             <Routes>
               <Route path="/" element={<DashboardPage />} />
               <Route path="/servers" element={<ServerManagerPage />} />
-              <Route path="/mock" element={<MockServicesPage />} />
               <Route path="/clients" element={<ClientManagerPage />} />
               <Route path="/events" element={<EventManagerPage />} />
               <Route path="/messages" element={<MessageCenterPage />} />
