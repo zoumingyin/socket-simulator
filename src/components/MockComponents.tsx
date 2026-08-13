@@ -354,64 +354,66 @@ export function MockRuleModal({
       onOk={handleOk}
       onCancel={onCancel}
       confirmLoading={saving}
-      width={720}
+      width={480}
+      centered
+      destroyOnHidden
       okText="保存"
       cancelText="取消"
+      styles={{ body: { maxHeight: '70vh', overflowY: 'auto', paddingTop: 12 } }}
     >
-      <Form form={form} layout="vertical">
-        <Space style={{ width: '100%' }} size={16}>
-          <Form.Item name="name" label="规则名称" style={{ flex: 1, minWidth: 200 }}>
-            <Input placeholder="可选，仅展示用" />
+      <Form form={form} layout="vertical" size="small" requiredMark="optional">
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 100px', gap: 8 }}>
+          <Form.Item name="name" label="规则名称" style={{ marginBottom: 10 }}>
+            <Input placeholder="可选" />
           </Form.Item>
-          <Form.Item name="method" label="方法" rules={[{ required: true }]}>
-            <Select style={{ width: 120 }}>
+          <Form.Item name="method" label="方法" rules={[{ required: true }]} style={{ marginBottom: 10 }}>
+            <Select>
               {MOCK_METHODS.map((m) => <Option key={m} value={m}>{m}</Option>)}
             </Select>
           </Form.Item>
-        </Space>
+        </div>
 
         <Form.Item
           name="pathPattern"
-          label="路径模式"
-          extra="精确：/users  前缀：/users/*  参数：/users/:id"
+          label="路径"
+          extra="精确 /users · 前缀 /users/* · 参数 /users/:id"
           rules={[{ required: true }]}
+          style={{ marginBottom: 10 }}
         >
-          <Input placeholder="/users 或 /users/* 或 /users/:id" />
+          <Input placeholder="/users 或 /users/:id" />
         </Form.Item>
 
-        <Divider>匹配条件</Divider>
-        <Form.Item label="请求头匹配" name="matchHeaders">
-          <ConditionEditor />
-        </Form.Item>
-        <Form.Item label="查询参数匹配" name="matchQuery">
-          <ConditionEditor />
-        </Form.Item>
-        <Form.Item name="matchBody" label="请求体包含子串（可选）">
-          <Input placeholder="匹配请求体中是否包含该字符串" />
-        </Form.Item>
-
-        <Divider>响应</Divider>
-        <Space style={{ width: '100%' }} size={16}>
-          <Form.Item name="responseStatusCode" label="状态码" rules={[{ required: true }]}>
-            <InputNumber min={100} max={599} style={{ width: 120 }} />
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 72px', gap: 8 }}>
+          <Form.Item name="responseStatusCode" label="状态码" rules={[{ required: true }]} style={{ marginBottom: 10 }}>
+            <InputNumber min={100} max={599} style={{ width: '100%' }} />
           </Form.Item>
-          <Form.Item name="responseDelayMs" label="延迟(ms)">
-            <InputNumber min={0} max={60000} style={{ width: 120 }} />
+          <Form.Item name="responseDelayMs" label="延迟(ms)" style={{ marginBottom: 10 }}>
+            <InputNumber min={0} max={60000} style={{ width: '100%' }} />
           </Form.Item>
-          <Form.Item name="enabled" label="启用" valuePropName="checked">
+          <Form.Item name="enabled" label="启用" valuePropName="checked" style={{ marginBottom: 10 }}>
             <Switch />
           </Form.Item>
-        </Space>
+        </div>
 
-        <Form.Item name="responseHeaders" label="响应头">
+        <Form.Item name="responseBody" label="响应体" rules={[{ required: true }]} style={{ marginBottom: 10 }}>
+          <JsonEditor rows={4} />
+        </Form.Item>
+
+        <Divider style={{ margin: '8px 0 12px' }}>高级匹配（可选）</Divider>
+
+        <Form.Item label="请求头" name="matchHeaders" style={{ marginBottom: 10 }}>
+          <ConditionEditor />
+        </Form.Item>
+        <Form.Item label="查询参数" name="matchQuery" style={{ marginBottom: 10 }}>
+          <ConditionEditor />
+        </Form.Item>
+        <Form.Item name="matchBody" label="请求体包含" style={{ marginBottom: 10 }}>
+          <Input placeholder="可选子串" />
+        </Form.Item>
+        <Form.Item name="responseHeaders" label="响应头" style={{ marginBottom: 10 }}>
           <ConditionEditor valueIsHeaderValue />
         </Form.Item>
-
-        <Form.Item name="responseBody" label="响应体" rules={[{ required: true }]}>
-          <JsonEditor rows={6} />
-        </Form.Item>
-
-        <Form.Item name="description" label="描述">
+        <Form.Item name="description" label="描述" style={{ marginBottom: 0 }}>
           <Input placeholder="可选" />
         </Form.Item>
       </Form>
