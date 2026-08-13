@@ -27,6 +27,7 @@ use crate::backend::types::*;
 use nanoid::nanoid;
 
 /// 受管服务连接回调集合（由 ServiceManager 注入）
+#[derive(Clone)]
 pub struct TransportHooks {
     /// 客户端连接：`ClientInfo.id` 为原始 socketId（不含 serverId 前缀）
     pub on_connect: Arc<dyn Fn(ClientInfo) + Send + Sync>,

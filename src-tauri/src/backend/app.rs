@@ -8,6 +8,8 @@ use std::sync::Arc;
 
 use tauri::{AppHandle, Manager};
 
+use tower_http::cors::CorsLayer;
+
 use crate::backend::api::router::build_router;
 use crate::backend::constants::*;
 use crate::backend::eventbus::EventBus;
@@ -16,6 +18,7 @@ use crate::backend::managers::config_manager::ConfigManager;
 use crate::backend::managers::event_manager::EventManager;
 use crate::backend::managers::log_manager::LogManager;
 use crate::backend::managers::service_manager::ServiceManager;
+use crate::backend::mock::MockManager;
 use crate::backend::net::port_release::release_port;
 
 /// 后端聚合根
@@ -27,6 +30,7 @@ pub struct Backend {
     pub events: Arc<EventManager>,
     pub services: Arc<ServiceManager>,
     pub event_bus: EventBus,
+    pub mock: Arc<MockManager>,
 }
 
 impl Backend {
@@ -52,6 +56,7 @@ impl Backend {
         ));
         services.reload();
         let events = Arc::new(EventManager::new(config.clone(), services.clone()));
+        let mock = Arc::new(MockManager::new());
 
         Self {
             config,
@@ -60,12 +65,11 @@ impl Backend {
             events,
             services,
             event_bus,
+            mock,
         }
     }
 
-    /// 测试专用构造：在不依赖 Tauri `AppHandle` 的前提下构建完整 `Backend`。
-    ///
-    /// 仅用于集成测试（自旋 axum router + 连接 `/admin/ws`）。生产路径仍走 `new(app)`。
+    /// 测试专用构造
     #[cfg(test)]
     pub fn new_test(data_dir: std::path::PathBuf) -> Self {
         let config_dir = data_dir.join("config");
@@ -84,6 +88,7 @@ impl Backend {
         ));
         services.reload();
         let events = Arc::new(EventManager::new(config.clone(), services.clone()));
+        let mock = Arc::new(MockManager::new());
 
         Self {
             config,
@@ -92,16 +97,15 @@ impl Backend {
             events,
             services,
             event_bus,
+            mock,
         }
     }
 
-    /// 优雅关闭后端：停止全部受管服务。
-    ///
-    /// 事件轮询任务在独立 tokio 任务中运行且无外部中止句柄，进程退出时随进程结束；
-    /// 此处显式停止全部 WsServer，确保端口被释放、连接被关闭。
+    /// 优雅关闭后端
     pub async fn shutdown(&self) {
         let _ = self.services.stop_all().await;
-        println!("[backend] 已停止全部受管服务，准备退出");
+        self.mock.stop_all().await;
+        println!("[backend] 已停止全部服务，准备退出");
     }
 }
 
@@ -121,7 +125,37 @@ pub async fn run(backend: Backend) {
         }
     }
 
-    let app = build_router(state.clone());
+    // 恢复 Mock 服务（主端口的标记；自定义端口的立即启动 listener）
+    let sys = state.config.get_system_settings();
+    state.mock.restore(&state.config, &sys).await;
+
+    // 构建主路由：显式 API + WS + 统一 fallback（Mock → 前端静态文件 → SPA index.html）
+    //
+    // 路由优先级：
+    //   1. /api/*         → REST API（显式路由）
+    //   2. /admin/ws      → 管理 WebSocket（显式路由）
+    //   3. Mock basePath  → Mock 引擎分发（dispatch_main_port 返回 Some 时）
+    //   4. 静态文件        → dist/assets/*.js|css|...（frontend::serve）
+    //   5. SPA fallback   → index.html（React Router 客户端路由）
+    let app = build_router(state.clone())
+        .fallback(move |req: axum::extract::Request| {
+            let cfg = state.config.clone();
+            let sys = state.config.get_system_settings();
+            let mock = state.mock.clone();
+            async move {
+                // 提取 path（dispatch_main_port 会消费 req）
+                let path = req.uri().path().to_string();
+
+                // 1. 尝试 Mock 分发（仅主端口 Mock 服务）
+                if let Some(resp) = mock.dispatch_main_port(&cfg, &sys, req).await {
+                    return resp;
+                }
+
+                // 2. 前端静态文件 / SPA 回退
+                crate::backend::frontend::serve(&path)
+            }
+        })
+        .layer(CorsLayer::permissive());
 
     let port = api_port();
     let addr = (BIND_HOST, port);
@@ -141,7 +175,15 @@ pub async fn run(backend: Backend) {
 
     match listener {
         Some(listener) => {
-            println!("[backend] REST API + 管理 WS 监听 http://{}:{}", BIND_HOST, port);
+            let frontend_status = if crate::backend::frontend::is_embedded() {
+                "已嵌入"
+            } else {
+                "未构建（dist/ 为空）"
+            };
+            println!(
+                "[backend] REST API + 管理 WS + Mock + 前端({}) 监听 http://{}:{}",
+                frontend_status, BIND_HOST, port
+            );
             if let Err(e) = axum::serve(listener, app).await {
                 eprintln!("[backend] REST 服务异常退出: {}", e);
             }

@@ -97,8 +97,8 @@ export function DashboardPage(): React.ReactElement {
       key: 'protocol',
       align: 'center' as const,
       render: (v: string) => (
-        <Tag color={v === 'websocket' ? 'blue' : 'green'}>
-          {v === 'websocket' ? 'WS' : 'S.IO'}
+        <Tag color={v === 'websocket' ? 'blue' : v === 'http' ? 'purple' : 'green'}>
+          {v === 'websocket' ? 'WS' : v === 'http' ? 'HTTP' : 'S.IO'}
         </Tag>
       ),
     },

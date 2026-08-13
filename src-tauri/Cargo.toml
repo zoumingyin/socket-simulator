@@ -18,6 +18,8 @@ serde_json = "1"
 tokio = { version = "1", features = ["rt-multi-thread", "macros", "net", "time", "sync", "io-util"] }
 # REST 框架（启用 ws feature 以支持管理端 WebSocket 通道 /admin/ws）
 axum = { version = "0.7", features = ["ws"] }
+# Mock 服务用：正则匹配（headers/query matchKind=regex）
+regex = "1"
 tower = "0.5"
 tower-http = { version = "0.5", features = ["cors"] }
 # 受管服务 WS 服务端
@@ -45,6 +47,8 @@ uuid = { version = "1", features = ["v4", "serde"] }
 tokio-rustls = "0.25"
 rustls = "0.23"
 rustls-pemfile = "2"
+# 前端静态资源嵌入（将 dist/ 编入二进制，由 axum 统一路由提供）
+rust-embed = "8"
 
 [build-dependencies]
 tauri-build = { version = "2", features = [] }

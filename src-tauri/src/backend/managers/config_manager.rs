@@ -99,6 +99,26 @@ impl ConfigManager {
         self.data.lock().unwrap().window_config.clone()
     }
 
+    // ===== Mock 服务 =====
+
+    pub fn get_mock_services(&self) -> Vec<MockServiceConfig> {
+        self.data.lock().unwrap().mock_services.clone()
+    }
+
+    pub fn get_mock_service_by_id(&self, id: &str) -> Option<MockServiceConfig> {
+        self.data
+            .lock()
+            .unwrap()
+            .mock_services
+            .iter()
+            .find(|s| s.id == id)
+            .cloned()
+    }
+
+    pub fn save_mock_services(&self, list: Vec<MockServiceConfig>) {
+        self.update(|d| d.mock_services = list);
+    }
+
     pub fn export_all(&self) -> PersistedConfig {
         self.data.lock().unwrap().clone()
     }
@@ -144,6 +164,7 @@ impl ConfigManager {
             d.servers = config.servers.clone();
             d.events = config.events.clone();
             d.templates = config.templates.clone();
+            d.mock_services = config.mock_services.clone();
             d.system_settings = config.system_settings.clone();
             d.window_config = config.window_config.clone();
             d.version = config.version.clone();

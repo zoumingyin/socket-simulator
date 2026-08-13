@@ -101,6 +101,143 @@ pub(crate) struct SettingsBody {
     window_config: Option<WindowConfig>,
 }
 
+// ==================== Mock 服务 ====================
+
+pub async fn mock_list(State(b): State<AppState>) -> Resp {
+    let services = b.config.get_mock_services();
+    ok(serde_json::to_value(services).unwrap_or(Value::Null))
+}
+
+pub async fn mock_get(State(b): State<AppState>, Json(body): Json<MockId>) -> Resp {
+    match b.config.get_mock_service_by_id(&body.id) {
+        Some(s) => ok(serde_json::to_value(s).unwrap_or(Value::Null)),
+        None => err("MOCK_NOT_FOUND", format!("未找到 mock 服务 {}", body.id), 404),
+    }
+}
+
+pub async fn mock_add(State(b): State<AppState>, Json(mut body): Json<MockServiceConfig>) -> Resp {
+    if body.id.is_empty() {
+        body.id = uuid::Uuid::new_v4().to_string();
+    }
+    if body.base_path.starts_with("/admin/api") {
+        return err(
+            "MOCK_BAD_BASEPATH",
+            "basePath 不能以 /admin/api 开头".into(),
+            400,
+        );
+    }
+    if let Some(p) = body.custom_port {
+        if p == api_port() {
+            return err(
+                "MOCK_BAD_PORT",
+                "自定义端口不能与管理窗口端口相同".into(),
+                400,
+            );
+        }
+    }
+    let now = now_rfc3339();
+    if body.created_at.is_empty() {
+        body.created_at = now.clone();
+    }
+    body.updated_at = now;
+
+    let mut list = b.config.get_mock_services();
+    list.push(body.clone());
+    b.config.save_mock_services(list);
+
+    // 若启用，立即启动（自定义端口立即监听，主端口仅标记）
+    if body.enabled {
+        let sys = b.config.get_system_settings();
+        let _ = b.mock.start(body.clone(), &sys).await;
+    }
+
+    ok_msg(
+        serde_json::to_value(body).unwrap_or(Value::Null),
+        "添加成功",
+    )
+}
+
+pub async fn mock_update(State(b): State<AppState>, Json(mut body): Json<MockServiceConfig>) -> Resp {
+    if body.base_path.starts_with("/admin/api") {
+        return err(
+            "MOCK_BAD_BASEPATH",
+            "basePath 不能以 /admin/api 开头".into(),
+            400,
+        );
+    }
+    if let Some(p) = body.custom_port {
+        if p == api_port() {
+            return err(
+                "MOCK_BAD_PORT",
+                "自定义端口不能与管理窗口端口相同".into(),
+                400,
+            );
+        }
+    }
+    body.updated_at = now_rfc3339();
+
+    let mut list = b.config.get_mock_services();
+    let mut found = false;
+    for s in list.iter_mut() {
+        if s.id == body.id {
+            *s = body.clone();
+            found = true;
+            break;
+        }
+    }
+    if !found {
+        list.push(body.clone());
+    }
+    b.config.save_mock_services(list);
+
+    // 重启：先停后启（端口/路径变更生效）
+    b.mock.stop(&body.id).await;
+    if body.enabled {
+        let sys = b.config.get_system_settings();
+        let _ = b.mock.start(body.clone(), &sys).await;
+    }
+
+    ok_msg(
+        serde_json::to_value(body).unwrap_or(Value::Null),
+        "更新成功",
+    )
+}
+
+pub async fn mock_remove(State(b): State<AppState>, Json(body): Json<MockId>) -> Resp {
+    b.mock.stop(&body.id).await;
+    let list = b
+        .config
+        .get_mock_services()
+        .into_iter()
+        .filter(|s| s.id != body.id)
+        .collect();
+    b.config.save_mock_services(list);
+    ok_msg_only("删除成功")
+}
+
+pub async fn mock_start(State(b): State<AppState>, Json(body): Json<MockId>) -> Resp {
+    let cfg = match b.config.get_mock_service_by_id(&body.id) {
+        Some(s) => s,
+        None => return err("MOCK_NOT_FOUND", "mock 服务不存在".into(), 404),
+    };
+    let sys = b.config.get_system_settings();
+    match b.mock.start(cfg, &sys).await {
+        Ok(port) => ok(serde_json::json!({ "port": port })),
+        Err(e) => err("MOCK_START_FAIL", e, 500),
+    }
+}
+
+pub async fn mock_stop(State(b): State<AppState>, Json(body): Json<MockId>) -> Resp {
+    b.mock.stop(&body.id).await;
+    ok_msg_only("停止成功")
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct MockId {
+    id: String,
+}
+
 // ==================== 服务管理 ====================
 
 pub async fn get_servers(State(b): State<AppState>) -> Resp {

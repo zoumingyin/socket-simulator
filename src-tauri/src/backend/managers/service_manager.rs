@@ -11,7 +11,9 @@ use std::time::Duration;
 use crate::backend::constants::*;
 use crate::backend::error::BackendError;
 use crate::backend::eventbus::EventBus;
+use crate::backend::transport::http::HttpServer;
 use crate::backend::transport::socketio::SocketIoServer;
+use crate::backend::transport::unified::UnifiedServer;
 use crate::backend::transport::websocket::{TransportHooks, WsServer};
 use crate::backend::transport::Transport;
 use crate::backend::types::*;
@@ -182,7 +184,20 @@ impl ServiceManager {
         };
 
         let protocol = cfg.protocol;
-        let transport: Arc<dyn Transport> = match protocol {
+        let transport: Arc<dyn Transport> = if cfg.mock_enabled {
+            // ===== 统一路由模式：Mock HTTP + Socket 共端口 =====
+            // 使用 UnifiedServer，在同一个 axum Router 上同时处理：
+            // - WebSocket 升级请求 → Socket 传输层
+            // - 普通 HTTP 请求 → Mock 引擎（规则匹配 → 模拟响应）
+            // 两者通过 fallback handler 中的 Option<WebSocketUpgrade> 自动区分
+            let unified = Arc::new_cyclic(|weak| {
+                UnifiedServer::new(cfg, sys, hooks, weak.clone())
+            });
+            unified.start().await?;
+            unified as Arc<dyn Transport>
+        } else {
+            // ===== 独立传输层模式（原有逻辑） =====
+            match protocol {
             ProtocolType::Websocket => {
                 let ws = Arc::new_cyclic(|weak| WsServer::new(cfg, sys, hooks, weak.clone()));
                 ws.start().await?;
@@ -192,6 +207,12 @@ impl ServiceManager {
                 let sio = Arc::new(SocketIoServer::new(cfg, sys, hooks));
                 sio.start().await?;
                 sio as Arc<dyn Transport>
+            }
+            ProtocolType::Http => {
+                let http = Arc::new(HttpServer::new(cfg, sys, hooks));
+                http.start().await?;
+                http as Arc<dyn Transport>
+            }
             }
         };
 

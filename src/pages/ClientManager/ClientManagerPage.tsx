@@ -130,7 +130,7 @@ export function ClientManagerPage(): React.ReactElement {
       dataIndex: 'protocol',
       key: 'protocol',
       align: 'center' as const,
-      render: (v: string) => <Tag color={v === 'websocket' ? 'blue' : 'green'}>{v.toUpperCase()}</Tag>,
+      render: (v: string) => <Tag color={v === 'websocket' ? 'blue' : v === 'http' ? 'purple' : 'green'}>{v.toUpperCase()}</Tag>,
     },
     {
       title: '连接时间',

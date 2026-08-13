@@ -15,6 +15,77 @@ pub enum ProtocolType {
     Websocket,
     #[serde(rename = "socket.io")]
     SocketIo,
+    #[serde(rename = "http")]
+    Http,
+}
+
+/// HTTP 方法（受管 HTTP 服务的自定义路由可指定）
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, Default)]
+pub enum HttpMethod {
+    #[default]
+    #[serde(rename = "GET")]
+    Get,
+    #[serde(rename = "POST")]
+    Post,
+    #[serde(rename = "PUT")]
+    Put,
+    #[serde(rename = "DELETE")]
+    Delete,
+    #[serde(rename = "PATCH")]
+    Patch,
+    #[serde(rename = "HEAD")]
+    Head,
+    #[serde(rename = "OPTIONS")]
+    Options,
+    #[serde(rename = "ANY")]
+    Any,
+}
+
+impl HttpMethod {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            HttpMethod::Get => "GET",
+            HttpMethod::Post => "POST",
+            HttpMethod::Put => "PUT",
+            HttpMethod::Delete => "DELETE",
+            HttpMethod::Patch => "PATCH",
+            HttpMethod::Head => "HEAD",
+            HttpMethod::Options => "OPTIONS",
+            HttpMethod::Any => "ANY",
+        }
+    }
+}
+
+/// HTTP 路由类型
+/// - Inbound：收消息（body 为 JSON），映射到 on_message
+/// - Stream：SSE 长连接，server→client 单向推送
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
+pub enum HttpRouteType {
+    #[default]
+    #[serde(rename = "inbound")]
+    Inbound,
+    #[serde(rename = "stream")]
+    Stream,
+}
+
+/// HTTP 自定义路由配置（每个受管 HTTP 服务可配多条）
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct HttpRouteConfig {
+    #[serde(default)]
+    pub id: String,
+    #[serde(default)]
+    pub method: HttpMethod,
+    /// 路径，支持 `{event}` 占位符（如 `/{event}`、`/order/{event}`）
+    #[serde(default)]
+    pub path: String,
+    #[serde(default)]
+    pub route_type: HttpRouteType,
+    /// 固定事件名；若 None 且路径含 `{event}` 则取路径段；否则取末段
+    #[serde(default)]
+    pub event: Option<String>,
+    #[serde(default)]
+    pub description: Option<String>,
 }
 
 /// 日志等级
@@ -41,6 +112,106 @@ impl LogLevel {
             LogLevel::Error => "ERROR",
         }
     }
+}
+
+/// 头部/查询匹配条件
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct MockMatchCondition {
+    #[serde(default)]
+    pub key: String,
+    #[serde(default)]
+    pub value: String,
+    /// 匹配方式：exact / contains / regex / exists
+    #[serde(default = "default_match_kind")]
+    pub match_kind: String,
+    #[serde(default)]
+    pub enabled: bool,
+}
+
+fn default_match_kind() -> String {
+    "exact".to_string()
+}
+
+fn default_true() -> bool {
+    true
+}
+
+fn default_response_status() -> u16 {
+    200
+}
+
+fn default_response_body() -> String {
+    "{\"message\":\"ok\"}".to_string()
+}
+
+/// Mock 模拟规则
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct MockRule {
+    #[serde(default)]
+    pub id: String,
+    #[serde(default)]
+    pub name: String,
+    /// HTTP 方法（含 ANY）
+    #[serde(default)]
+    pub method: HttpMethod,
+    /// 路径模式：精确 `/users`、前缀 `/users/*`、参数 `/users/:id`
+    #[serde(default)]
+    pub path_pattern: String,
+    #[serde(default)]
+    pub match_headers: Vec<MockMatchCondition>,
+    #[serde(default)]
+    pub match_query: Vec<MockMatchCondition>,
+    /// 请求体匹配（包含子串；空表示不匹配 body）
+    #[serde(default)]
+    pub match_body: Option<String>,
+    #[serde(default = "default_response_status")]
+    pub response_status_code: u16,
+    #[serde(default)]
+    pub response_headers: Vec<MockMatchCondition>,
+    #[serde(default = "default_response_body")]
+    pub response_body: String,
+    #[serde(default)]
+    pub response_delay_ms: u32,
+    #[serde(default = "default_true")]
+    pub enabled: bool,
+    #[serde(default)]
+    pub description: Option<String>,
+}
+
+/// Mock 服务配置
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct MockServiceConfig {
+    #[serde(default)]
+    pub id: String,
+    #[serde(default)]
+    pub name: String,
+    #[serde(default)]
+    pub description: String,
+    /// 挂载路径（如 `/api/gaop/v1`）；主端口模式下作为前缀；自定义端口模式下作为该端口的根路径
+    #[serde(default)]
+    pub base_path: String,
+    /// 自定义端口；None = 挂载到主端口 3080
+    #[serde(default)]
+    pub custom_port: Option<u16>,
+    /// 未匹配规则时返回的状态码
+    #[serde(default = "default_response_status")]
+    pub default_status_code: u16,
+    /// 未匹配规则时返回的响应体
+    #[serde(default = "default_response_body")]
+    pub default_response_body: String,
+    #[serde(default)]
+    pub default_delay_ms: u32,
+    #[serde(default = "default_true")]
+    pub enabled: bool,
+    #[serde(default)]
+    pub rules: Vec<MockRule>,
+    #[serde(default)]
+    pub created_at: String,
+    #[serde(default)]
+    pub updated_at: String,
 }
 
 /// 服务运行状态
@@ -74,6 +245,29 @@ pub struct ServerConfig {
     pub wss_enabled: bool,
     pub cert_path: Option<String>,
     pub key_path: Option<String>,
+    /// HTTP 协议自定义路由（仅 protocol=http 生效；为空则用内置默认：
+    /// `POST /{event}` 收消息 + `GET /stream` SSE 推送）
+    #[serde(default)]
+    pub http_routes: Vec<HttpRouteConfig>,
+    // ---------- 统一路由模式：Mock HTTP + Socket 共端口 ----------
+    /// 是否在同一端口上同时提供 Mock HTTP 响应（统一路由模式）。
+    /// 启用后，非 WebSocket 升级的 HTTP 请求将由 Mock 引擎处理（规则匹配 → 模拟响应）。
+    /// WebSocket 升级请求（含 `Upgrade: websocket` 头）仍由 Socket 传输层处理。
+    /// 两者在同一路由 fallback handler 中通过请求类型自动区分，互不干扰。
+    #[serde(default)]
+    pub mock_enabled: bool,
+    /// Mock 规则列表（mock_enabled=true 时生效）；按顺序匹配，首个命中即返回
+    #[serde(default)]
+    pub mock_rules: Vec<MockRule>,
+    /// Mock 默认状态码（未匹配规则时返回）
+    #[serde(default = "default_response_status")]
+    pub mock_default_status_code: u16,
+    /// Mock 默认响应体（未匹配规则时返回）
+    #[serde(default = "default_response_body")]
+    pub mock_default_response_body: String,
+    /// Mock 默认延迟（ms，未匹配规则时）
+    #[serde(default)]
+    pub mock_default_delay_ms: u32,
     pub created_at: String,
     pub updated_at: String,
 }
@@ -92,6 +286,12 @@ impl Default for ServerConfig {
             wss_enabled: false,
             cert_path: None,
             key_path: None,
+            http_routes: Vec::new(),
+            mock_enabled: false,
+            mock_rules: Vec::new(),
+            mock_default_status_code: 200,
+            mock_default_response_body: "{\"message\":\"ok\"}".to_string(),
+            mock_default_delay_ms: 0,
             created_at: String::new(),
             updated_at: String::new(),
         }
@@ -431,6 +631,8 @@ pub struct PersistedConfig {
     #[serde(default)]
     pub templates: Vec<MessageTemplate>,
     #[serde(default)]
+    pub mock_services: Vec<MockServiceConfig>,
+    #[serde(default)]
     pub system_settings: SystemSettings,
     #[serde(default)]
     pub window_config: WindowConfig,
@@ -450,6 +652,7 @@ impl Default for PersistedConfig {
             servers: Vec::new(),
             events: Vec::new(),
             templates: Vec::new(),
+            mock_services: Vec::new(),
             system_settings: SystemSettings::default(),
             window_config: WindowConfig::default(),
             version: default_version(),
