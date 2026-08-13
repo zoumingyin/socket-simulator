@@ -161,6 +161,7 @@ export function ServerManagerPage(): React.ReactElement {
       {error && <Alert type="error" message={error} style={{ marginBottom: 12 }} closable />}
 
       <div
+        className="tech-panel"
         style={{
           display: 'flex',
           flex: 1,
@@ -173,6 +174,7 @@ export function ServerManagerPage(): React.ReactElement {
         }}
       >
         <aside
+          className="tech-panel-aside"
           style={{
             width: 280,
             flexShrink: 0,

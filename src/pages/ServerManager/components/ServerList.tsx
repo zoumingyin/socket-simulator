@@ -199,6 +199,7 @@ export function ServerList({
                 key={server.id}
                 role="button"
                 tabIndex={0}
+                className={`tech-list-row${active ? ' is-active' : ''}`}
                 onClick={() => onSelect(server.id)}
                 onKeyDown={(e) => {
                   if (e.key === 'Enter' || e.key === ' ') {
@@ -225,9 +226,7 @@ export function ServerList({
                   }`,
                   background: active
                     ? token.colorPrimaryBg
-                    : hovering
-                      ? token.colorBgContainer
-                      : token.colorBgContainer,
+                    : token.colorBgContainer,
                   boxShadow: active
                     ? `inset 3px 0 0 ${token.colorPrimary}`
                     : running

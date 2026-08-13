@@ -32,10 +32,12 @@ export function HttpMockSection({
   }, [server, form]);
 
   return (
-    <Space direction="vertical" size={16} style={{ width: '100%' }}>
+    <div style={{ width: '100%', maxWidth: '100%', minWidth: 0, overflowX: 'hidden' }}>
+      <Space direction="vertical" size={16} style={{ width: '100%', maxWidth: '100%' }}>
       <Form
         form={form}
         layout="vertical"
+        style={{ maxWidth: '100%' }}
         onFinish={(v) => onSave({
           mockEnabled: v.mockEnabled,
           mockDefaultStatusCode: v.mockDefaultStatusCode,
@@ -78,7 +80,7 @@ export function HttpMockSection({
       </Form>
 
       {mockEnabled ? (
-        <div>
+        <div style={{ width: '100%', minWidth: 0, overflow: 'hidden' }}>
           <Text strong style={{ display: 'block', marginBottom: 8 }}>匹配规则</Text>
           <MockRulesTable
             rules={server.mockRules ?? []}
@@ -89,6 +91,7 @@ export function HttpMockSection({
       ) : (
         <Text type="secondary">开启 Mock 后可在此编辑规则，并在「试跑」中验证接口。</Text>
       )}
-    </Space>
+      </Space>
+    </div>
   );
 }

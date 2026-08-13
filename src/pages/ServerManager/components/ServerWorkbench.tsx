@@ -114,7 +114,7 @@ export function ServerWorkbench({
         style={{ marginBottom: 16, alignSelf: 'flex-start' }}
       />
 
-      <div style={{ flex: 1, overflow: 'auto', minHeight: 0, paddingRight: 4 }}>
+      <div style={{ flex: 1, overflowY: 'auto', overflowX: 'hidden', minHeight: 0, minWidth: 0, paddingRight: 4 }}>
         {activeSection === 'overview' && (
           <OverviewSection
             server={server}

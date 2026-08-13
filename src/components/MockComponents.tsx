@@ -155,7 +155,7 @@ export function JsonEditor({ value, onChange, rows = 6, placeholder }: {
   };
 
   return (
-    <div>
+    <div style={{ width: '100%', maxWidth: '100%', minWidth: 0, overflow: 'hidden' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginBottom: 6, flexWrap: 'wrap' }}>
         <Segmented
           size="small"
@@ -202,27 +202,27 @@ export function JsonEditor({ value, onChange, rows = 6, placeholder }: {
       )}
 
       {mode === 'kv' && (
-        <div style={{ border: '1px solid #d9d9d9', borderRadius: 6, padding: 8 }}>
+        <div style={{ border: '1px solid #d9d9d9', borderRadius: 6, padding: 8, maxWidth: '100%', overflow: 'hidden' }}>
           {kvPairs.map((p, i) => (
-            <div key={i} style={{ display: 'flex', gap: 4, marginBottom: 4, alignItems: 'center' }}>
-              <Input size="small" placeholder="字段名" value={p.key} onChange={(e) => kvUpdate(i, { key: e.target.value })} style={{ width: 130 }} />
-              <Select size="small" value={p.type} onChange={(v: JsonValueType) => kvUpdate(i, { type: v })} style={{ width: 90 }}>
+            <div key={i} style={{ display: 'flex', gap: 4, marginBottom: 4, alignItems: 'center', minWidth: 0 }}>
+              <Input size="small" placeholder="字段名" value={p.key} onChange={(e) => kvUpdate(i, { key: e.target.value })} style={{ width: 100, flexShrink: 0 }} />
+              <Select size="small" value={p.type} onChange={(v: JsonValueType) => kvUpdate(i, { type: v })} style={{ width: 88, flexShrink: 0 }}>
                 <Select.Option value="string">string</Select.Option>
                 <Select.Option value="number">number</Select.Option>
                 <Select.Option value="boolean">boolean</Select.Option>
                 <Select.Option value="null">null</Select.Option>
               </Select>
               {p.type === 'boolean' ? (
-                <Select size="small" value={p.value === 'true' ? 'true' : 'false'} onChange={(v) => kvUpdate(i, { value: v })} style={{ width: 100 }}>
+                <Select size="small" value={p.value === 'true' ? 'true' : 'false'} onChange={(v) => kvUpdate(i, { value: v })} style={{ width: 88, flexShrink: 0 }}>
                   <Select.Option value="true">true</Select.Option>
                   <Select.Option value="false">false</Select.Option>
                 </Select>
               ) : p.type === 'null' ? (
-                <Input size="small" value="null" disabled style={{ flex: 1 }} />
+                <Input size="small" value="null" disabled style={{ flex: 1, minWidth: 0 }} />
               ) : (
-                <Input size="small" placeholder="值" value={p.value} onChange={(e) => kvUpdate(i, { value: e.target.value })} style={{ flex: 1 }} />
+                <Input size="small" placeholder="值" value={p.value} onChange={(e) => kvUpdate(i, { value: e.target.value })} style={{ flex: 1, minWidth: 0 }} />
               )}
-              <Button danger size="small" icon={<DeleteOutlined />} onClick={() => kvRemove(i)} />
+              <Button danger size="small" icon={<DeleteOutlined />} onClick={() => kvRemove(i)} style={{ flexShrink: 0 }} />
             </div>
           ))}
           <Button size="small" type="dashed" icon={<PlusOutlined />} onClick={kvAdd} style={{ marginTop: 4 }}>添加字段</Button>
@@ -455,17 +455,28 @@ export function MockRulesTable({
   };
 
   const columns: ColumnsType<MockRule> = [
-    { title: '方法', dataIndex: 'method', key: 'method', width: 80, render: (v: HttpMethod) => <Tag color="blue">{v}</Tag> },
+    { title: '方法', dataIndex: 'method', key: 'method', width: 72, render: (v: HttpMethod) => <Tag color="blue" style={{ margin: 0 }}>{v}</Tag> },
     { title: '路径', dataIndex: 'pathPattern', key: 'pathPattern', ellipsis: true },
-    { title: '状态码', dataIndex: 'responseStatusCode', key: 'responseStatusCode', width: 80 },
-    { title: '延迟(ms)', dataIndex: 'responseDelayMs', key: 'responseDelayMs', width: 90 },
-    { title: '启用', dataIndex: 'enabled', key: 'enabled', width: 70, render: (v: boolean, r: MockRule) => <Switch size="small" checked={v} onChange={(c) => handleToggle(r, c)} /> },
+    { title: '状态', dataIndex: 'responseStatusCode', key: 'responseStatusCode', width: 56 },
+    { title: '延迟', dataIndex: 'responseDelayMs', key: 'responseDelayMs', width: 56, render: (v: number) => `${v}ms` },
     {
-      title: '操作', key: 'actions', width: 160, render: (_: unknown, r: MockRule) => (
-        <Space size={4}>
-          <Button size="small" icon={<EditOutlined />} onClick={() => openEdit(r)}>编辑</Button>
+      title: '启用',
+      dataIndex: 'enabled',
+      key: 'enabled',
+      width: 52,
+      render: (v: boolean, r: MockRule) => (
+        <Switch size="small" checked={v} onChange={(c) => handleToggle(r, c)} />
+      ),
+    },
+    {
+      title: '',
+      key: 'actions',
+      width: 72,
+      render: (_: unknown, r: MockRule) => (
+        <Space size={0}>
+          <Button type="text" size="small" icon={<EditOutlined />} onClick={() => openEdit(r)} />
           <Popconfirm title="确认删除？" onConfirm={() => handleDelete(r.id)}>
-            <Button size="small" danger icon={<DeleteOutlined />}>删除</Button>
+            <Button type="text" size="small" danger icon={<DeleteOutlined />} />
           </Popconfirm>
         </Space>
       ),
@@ -473,14 +484,22 @@ export function MockRulesTable({
   ];
 
   return (
-    <div>
-      <Space style={{ marginBottom: 12 }}>
+    <div style={{ width: '100%', maxWidth: '100%', minWidth: 0, overflow: 'hidden' }}>
+      <Space style={{ marginBottom: 12 }} wrap>
         <Button type="primary" icon={<PlusOutlined />} onClick={openNew}>新增规则</Button>
         <Text type="secondary" style={{ fontSize: 12 }}>
-          规则按顺序匹配，首个命中规则决定响应；未命中走默认响应
+          按顺序匹配，首个命中生效；未命中走默认响应
         </Text>
       </Space>
-      <Table rowKey="id" columns={columns} dataSource={rules} pagination={{ pageSize: 10 }} size="small" />
+      <Table
+        rowKey="id"
+        columns={columns}
+        dataSource={rules}
+        pagination={{ pageSize: 10, size: 'small' }}
+        size="small"
+        tableLayout="fixed"
+        style={{ width: '100%' }}
+      />
       <MockRuleModal open={modalOpen} editing={editing} onOk={handleOk} onCancel={() => setModalOpen(false)} />
     </div>
   );

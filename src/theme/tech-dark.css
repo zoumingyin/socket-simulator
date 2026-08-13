@@ -1,0 +1,103 @@
+/**
+ * 暗黑科技风全局样式（仅 html.theme-tech-dark 生效）
+ */
+
+html.theme-tech-dark {
+  color-scheme: dark;
+}
+
+html.theme-tech-dark body {
+  background: #070b14;
+}
+
+html.theme-tech-dark #root {
+  background: #070b14;
+}
+
+/* 主内容区：细网格 + 微光边框 */
+html.theme-tech-dark .tech-shell-content {
+  background-color: #0c1220 !important;
+  background-image:
+    linear-gradient(rgba(0, 212, 255, 0.035) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(0, 212, 255, 0.035) 1px, transparent 1px);
+  background-size: 24px 24px;
+  border: 1px solid rgba(0, 212, 255, 0.18) !important;
+  box-shadow:
+    0 0 0 1px rgba(8, 13, 24, 0.8),
+    inset 0 1px 0 rgba(0, 212, 255, 0.06),
+    0 0 28px rgba(0, 212, 255, 0.06);
+}
+
+html.theme-tech-dark .tech-shell-sider {
+  background: linear-gradient(180deg, #0a101c 0%, #080d18 100%) !important;
+  border-right: 1px solid rgba(0, 212, 255, 0.14) !important;
+}
+
+html.theme-tech-dark .tech-shell-brand {
+  border-bottom: 1px solid rgba(0, 212, 255, 0.16) !important;
+  background: rgba(0, 212, 255, 0.03);
+}
+
+html.theme-tech-dark .tech-shell-brand .ant-typography {
+  color: #00d4ff !important;
+  letter-spacing: 0.04em;
+  text-shadow: 0 0 18px rgba(0, 212, 255, 0.35);
+}
+
+html.theme-tech-dark .ant-layout {
+  background: #070b14 !important;
+}
+
+html.theme-tech-dark .ant-menu-dark {
+  background: transparent !important;
+}
+
+html.theme-tech-dark .ant-menu-dark .ant-menu-item-selected {
+  box-shadow: inset 2px 0 0 #00d4ff;
+}
+
+/* 服务管理：科技边框面板 */
+html.theme-tech-dark .tech-panel {
+  border: 1px solid rgba(0, 212, 255, 0.28) !important;
+  box-shadow:
+    0 0 0 1px rgba(0, 212, 255, 0.08),
+    0 0 24px rgba(0, 212, 255, 0.08),
+    inset 0 0 40px rgba(0, 212, 255, 0.03) !important;
+  background: rgba(12, 18, 32, 0.92) !important;
+}
+
+html.theme-tech-dark .tech-panel-aside {
+  background: rgba(8, 13, 24, 0.95) !important;
+  border-right: 1px solid rgba(0, 212, 255, 0.2) !important;
+}
+
+html.theme-tech-dark .tech-list-row {
+  background: rgba(15, 22, 40, 0.85) !important;
+  border-color: rgba(0, 212, 255, 0.16) !important;
+}
+
+html.theme-tech-dark .tech-list-row:hover {
+  border-color: rgba(0, 212, 255, 0.4) !important;
+  box-shadow: 0 0 12px rgba(0, 212, 255, 0.1);
+}
+
+html.theme-tech-dark .tech-list-row.is-active {
+  border-color: #00d4ff !important;
+  background: rgba(0, 212, 255, 0.1) !important;
+  box-shadow:
+    inset 3px 0 0 #00d4ff,
+    0 0 16px rgba(0, 212, 255, 0.15) !important;
+}
+
+html.theme-tech-dark .ant-btn-primary {
+  text-shadow: 0 0 8px rgba(0, 212, 255, 0.4);
+}
+
+html.theme-tech-dark .ant-segmented {
+  border: 1px solid rgba(0, 212, 255, 0.16);
+}
+
+html.theme-tech-dark .ant-table,
+html.theme-tech-dark .ant-card {
+  border: 1px solid rgba(0, 212, 255, 0.12);
+}

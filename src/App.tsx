@@ -19,6 +19,7 @@ import {
 } from "antd";
 import { SunOutlined, MoonOutlined } from "@ant-design/icons";
 import "./responsive.css";
+import "./theme/tech-dark.css";
 import {
   DashboardOutlined,
   CloudServerOutlined,
@@ -30,6 +31,11 @@ import {
 } from "@ant-design/icons";
 import zhCN from "antd/locale/zh_CN";
 import { useThemeStore } from "./store/useThemeStore";
+import {
+  lightThemeTokens,
+  techDarkComponentTokens,
+  techDarkTokens,
+} from "./theme/techDark";
 import { DashboardPage } from "./pages/Dashboard/DashboardPage.jsx";
 import { ServerManagerPage } from "./pages/ServerManager/ServerManagerPage.jsx";
 import { ClientManagerPage } from "./pages/ClientManager/ClientManagerPage.jsx";
@@ -65,6 +71,15 @@ function AppLayout(): React.ReactElement {
       adminSocket.disconnect();
     };
   }, []);
+
+  useEffect(() => {
+    const root = document.documentElement;
+    if (themeMode === "dark") {
+      root.classList.add("theme-tech-dark");
+    } else {
+      root.classList.remove("theme-tech-dark");
+    }
+  }, [themeMode]);
 
   // 监听托盘菜单事件（仅 Tauri 桌面环境）
   useEffect(() => {
@@ -165,50 +180,44 @@ function AppLayout(): React.ReactElement {
       locale={zhCN}
       theme={{
         algorithm,
-        token: {
-          colorPrimary: "#1677ff",
-          colorBgBase: isDark ? "#141414" : "#ffffff",
-          colorTextBase: isDark ? "#ffffff" : "#000000",
-        },
-        components: {
-          Card: {
-            colorBgContainer: isDark ? "#1f1f1f" : "#ffffff",
-          },
-          Table: {
-            colorBgContainer: isDark ? "#1f1f1f" : "#ffffff",
-            headerColor: isDark ? "#ffffff" : "#000000",
-          },
-          Modal: {
-            colorBgElevated: isDark ? "#1f1f1f" : "#ffffff",
-          },
-          Drawer: {
-            colorBgElevated: isDark ? "#1f1f1f" : "#ffffff",
-          },
-        },
+        token: isDark
+          ? { ...techDarkTokens }
+          : { ...lightThemeTokens },
+        components: isDark
+          ? { ...techDarkComponentTokens }
+          : {
+              Card: { colorBgContainer: "#ffffff" },
+              Table: { colorBgContainer: "#ffffff", headerColor: "#000000" },
+              Modal: { contentBg: "#ffffff" },
+              Drawer: { colorBgElevated: "#ffffff" },
+            },
       }}
     >
       <Layout style={{ minHeight: "100vh", display: "flex" }}>
         <Layout.Sider
           width={200}
           theme={isDark ? "dark" : "light"}
+          className={isDark ? "tech-shell-sider" : undefined}
           style={{ height: "100vh", overflow: "auto" }}
         >
           <div
+            className={isDark ? "tech-shell-brand" : undefined}
             style={{
-              height: 40,
+              height: 44,
               display: "flex",
               alignItems: "center",
               justifyContent: "space-between",
               padding: "0 12px",
-              borderBottom: `1px solid ${isDark ? "#333" : "#f0f0f0"}`,
+              borderBottom: `1px solid ${isDark ? "transparent" : "#f0f0f0"}`,
             }}
           >
             <Typography.Title
               level={5}
               style={{
                 margin: 0,
-                color: isDark ? "#fff" : "#1677ff",
-                fontSize: 14,
+                color: isDark ? "#00d4ff" : "#1677ff",
+                fontSize: 13,
+                fontWeight: 600,
               }}
             >
               Socket 管理平台
@@ -223,12 +232,14 @@ function AppLayout(): React.ReactElement {
           </div>
           <Menu
             mode="inline"
+            theme={isDark ? "dark" : "light"}
             selectedKeys={[location.pathname]}
             items={menuItems}
             style={{
-              height: "calc(100vh - 40px)",
+              height: "calc(100vh - 44px)",
               borderRight: 0,
               overflow: "auto",
+              background: "transparent",
             }}
             onClick={({ key }) => navigate(key)}
           />
@@ -239,16 +250,17 @@ function AppLayout(): React.ReactElement {
             flexDirection: "column",
             height: "100vh",
             overflow: "hidden",
-            background: isDark ? "#0a0a0a" : "#f5f5f5",
+            background: isDark ? "#070b14" : "#f5f5f5",
           }}
         >
           <Layout.Content
+            className={isDark ? "tech-shell-content" : undefined}
             style={{
               margin: 12,
               flex: 1,
               overflow: "auto",
-              background: isDark ? "#141414" : "#fff",
-              borderRadius: 8,
+              background: isDark ? "#0c1220" : "#fff",
+              borderRadius: 10,
               padding: 16,
             }}
           >
