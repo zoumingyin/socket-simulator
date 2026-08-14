@@ -6,7 +6,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import {
   Button, Space, Tag, Form, Input, InputNumber, Select, Switch, Modal,
-  Table, Divider, Tooltip, Segmented, message, Typography, Popconfirm,
+  Table, Divider, Tooltip, Segmented, message, Typography, Popconfirm, Collapse,
 } from 'antd';
 import {
   PlusOutlined, DeleteOutlined, CopyOutlined, ClearOutlined, EditOutlined,
@@ -306,11 +306,20 @@ export function MockRuleModal({
 }) {
   const [form] = Form.useForm();
   const [saving, setSaving] = useState(false);
+  const [advancedKeys, setAdvancedKeys] = useState<string[]>([]);
 
   useEffect(() => {
     if (open) {
+      setAdvancedKeys([]);
       if (editing) {
         form.setFieldsValue(editing);
+        const hasAdvanced =
+          (editing.matchHeaders?.length ?? 0) > 0
+          || (editing.matchQuery?.length ?? 0) > 0
+          || !!editing.matchBody
+          || (editing.responseHeaders?.length ?? 0) > 0
+          || !!editing.description;
+        if (hasAdvanced) setAdvancedKeys(['advanced']);
       } else {
         form.resetFields();
         form.setFieldsValue({
@@ -354,19 +363,19 @@ export function MockRuleModal({
       onOk={handleOk}
       onCancel={onCancel}
       confirmLoading={saving}
-      width={480}
+      width={560}
       centered
       destroyOnHidden
       okText="保存"
       cancelText="取消"
-      styles={{ body: { maxHeight: '70vh', overflowY: 'auto', paddingTop: 12 } }}
+      styles={{ body: { paddingTop: 12, overflow: 'visible' } }}
     >
       <Form form={form} layout="vertical" size="small" requiredMark="optional">
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 100px', gap: 8 }}>
-          <Form.Item name="name" label="规则名称" style={{ marginBottom: 10 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 108px', columnGap: 10 }}>
+          <Form.Item name="name" label="规则名称" style={{ marginBottom: 8 }}>
             <Input placeholder="可选" />
           </Form.Item>
-          <Form.Item name="method" label="方法" rules={[{ required: true }]} style={{ marginBottom: 10 }}>
+          <Form.Item name="method" label="方法" rules={[{ required: true }]} style={{ marginBottom: 8 }}>
             <Select>
               {MOCK_METHODS.map((m) => <Option key={m} value={m}>{m}</Option>)}
             </Select>
@@ -378,44 +387,57 @@ export function MockRuleModal({
           label="路径"
           extra="精确 /users · 前缀 /users/* · 参数 /users/:id"
           rules={[{ required: true }]}
-          style={{ marginBottom: 10 }}
+          style={{ marginBottom: 8 }}
         >
           <Input placeholder="/users 或 /users/:id" />
         </Form.Item>
 
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 72px', gap: 8 }}>
-          <Form.Item name="responseStatusCode" label="状态码" rules={[{ required: true }]} style={{ marginBottom: 10 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 80px', columnGap: 10 }}>
+          <Form.Item name="responseStatusCode" label="状态码" rules={[{ required: true }]} style={{ marginBottom: 8 }}>
             <InputNumber min={100} max={599} style={{ width: '100%' }} />
           </Form.Item>
-          <Form.Item name="responseDelayMs" label="延迟(ms)" style={{ marginBottom: 10 }}>
+          <Form.Item name="responseDelayMs" label="延迟(ms)" style={{ marginBottom: 8 }}>
             <InputNumber min={0} max={60000} style={{ width: '100%' }} />
           </Form.Item>
-          <Form.Item name="enabled" label="启用" valuePropName="checked" style={{ marginBottom: 10 }}>
+          <Form.Item name="enabled" label="启用" valuePropName="checked" style={{ marginBottom: 8 }}>
             <Switch />
           </Form.Item>
         </div>
 
-        <Form.Item name="responseBody" label="响应体" rules={[{ required: true }]} style={{ marginBottom: 10 }}>
-          <JsonEditor rows={4} />
+        <Form.Item name="responseBody" label="响应体" rules={[{ required: true }]} style={{ marginBottom: 4 }}>
+          <JsonEditor rows={3} />
         </Form.Item>
 
-        <Divider style={{ margin: '8px 0 12px' }}>高级匹配（可选）</Divider>
-
-        <Form.Item label="请求头" name="matchHeaders" style={{ marginBottom: 10 }}>
-          <ConditionEditor />
-        </Form.Item>
-        <Form.Item label="查询参数" name="matchQuery" style={{ marginBottom: 10 }}>
-          <ConditionEditor />
-        </Form.Item>
-        <Form.Item name="matchBody" label="请求体包含" style={{ marginBottom: 10 }}>
-          <Input placeholder="可选子串" />
-        </Form.Item>
-        <Form.Item name="responseHeaders" label="响应头" style={{ marginBottom: 10 }}>
-          <ConditionEditor valueIsHeaderValue />
-        </Form.Item>
-        <Form.Item name="description" label="描述" style={{ marginBottom: 0 }}>
-          <Input placeholder="可选" />
-        </Form.Item>
+        <Collapse
+          ghost
+          size="small"
+          activeKey={advancedKeys}
+          onChange={(keys) => setAdvancedKeys(keys as string[])}
+          styles={{ header: { paddingBlock: 6 }, body: { paddingTop: 4 } }}
+          items={[{
+            key: 'advanced',
+            label: '高级匹配（可选）',
+            children: (
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', columnGap: 10 }}>
+                <Form.Item label="请求头" name="matchHeaders" style={{ marginBottom: 8, gridColumn: '1 / -1' }}>
+                  <ConditionEditor />
+                </Form.Item>
+                <Form.Item label="查询参数" name="matchQuery" style={{ marginBottom: 8, gridColumn: '1 / -1' }}>
+                  <ConditionEditor />
+                </Form.Item>
+                <Form.Item name="matchBody" label="请求体包含" style={{ marginBottom: 8 }}>
+                  <Input placeholder="可选子串" />
+                </Form.Item>
+                <Form.Item name="description" label="描述" style={{ marginBottom: 8 }}>
+                  <Input placeholder="可选" />
+                </Form.Item>
+                <Form.Item name="responseHeaders" label="响应头" style={{ marginBottom: 0, gridColumn: '1 / -1' }}>
+                  <ConditionEditor valueIsHeaderValue />
+                </Form.Item>
+              </div>
+            ),
+          }]}
+        />
       </Form>
     </Modal>
   );
@@ -487,20 +509,18 @@ export function MockRulesTable({
 
   return (
     <div style={{ width: '100%', maxWidth: '100%', minWidth: 0, overflow: 'hidden' }}>
-      <Space style={{ marginBottom: 12 }} wrap>
+      <div style={{ marginBottom: 10 }}>
         <Button type="primary" icon={<PlusOutlined />} onClick={openNew}>新增规则</Button>
-        <Text type="secondary" style={{ fontSize: 12 }}>
-          按顺序匹配，首个命中生效；未命中走默认响应
-        </Text>
-      </Space>
+      </div>
       <Table
         rowKey="id"
         columns={columns}
         dataSource={rules}
-        pagination={{ pageSize: 10, size: 'small' }}
+        pagination={rules.length > 8 ? { pageSize: 8, size: 'small' } : false}
         size="small"
         tableLayout="fixed"
         style={{ width: '100%' }}
+        locale={{ emptyText: '暂无规则，点击上方新增' }}
       />
       <MockRuleModal open={modalOpen} editing={editing} onOk={handleOk} onCancel={() => setModalOpen(false)} />
     </div>
