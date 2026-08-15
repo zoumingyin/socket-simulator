@@ -3,7 +3,7 @@
  */
 import { create } from 'zustand';
 import type { SystemSettings, WindowConfig } from '../types/index';
-import { apiFetch } from '../api/client';
+import { api } from '../api';
 
 interface SettingsState {
   systemSettings: SystemSettings;
@@ -45,7 +45,7 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
   async fetchSettings() {
     set({ loading: true, error: undefined });
     try {
-      const res = await apiFetch<{ systemSettings: SystemSettings; windowConfig: WindowConfig }>('/api/settings');
+      const res = await api.settings.get();
       if (!res.success) {
         const errMsg = res.error || '加载设置失败';
         set({ loading: false, error: errMsg });
@@ -70,10 +70,7 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
     // 乐观更新
     set({ systemSettings: next, loading: true, error: undefined });
     try {
-      const res = await apiFetch('/api/settings', {
-        method: 'POST',
-        body: JSON.stringify({ systemSettings: next }),
-      });
+      const res = await api.settings.save({ systemSettings: next });
       if (!res.success) {
         // 回滚
         set({ systemSettings: prev, loading: false, error: res.error || '保存失败' });
@@ -96,10 +93,7 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
     const next = { ...prev, ...patch };
     set({ windowConfig: next, loading: true, error: undefined });
     try {
-      const res = await apiFetch('/api/settings', {
-        method: 'POST',
-        body: JSON.stringify({ windowConfig: next }),
-      });
+      const res = await api.settings.save({ windowConfig: next });
       if (!res.success) {
         set({ windowConfig: prev, loading: false, error: res.error || '保存失败' });
         throw new Error(res.error || '保存窗口配置失败');
@@ -115,15 +109,12 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
   },
 
   async exportConfig() {
-    const res = await apiFetch<Record<string, unknown>>('/api/export');
+    const res = await api.config.export();
     return res.data ?? {};
   },
 
   async importConfig(config) {
-    await apiFetch('/api/import', {
-      method: 'POST',
-      body: JSON.stringify(config),
-    });
+    await api.config.import(config);
     // 重新加载
     await get().fetchSettings();
   },

@@ -43,7 +43,6 @@ export function DashboardPage(): React.ReactElement {
   const {
     list: clients,
     fetchClients,
-    loading: clientLoading,
   } = useClientStore();
   const [refreshing, setRefreshing] = useState(false);
 

@@ -11,8 +11,7 @@ import {
 } from '../protocolStyles.js';
 import { OverviewSection } from './sections/OverviewSection.js';
 import { BasicsSection } from './sections/BasicsSection.js';
-import { HttpMockSection } from './sections/HttpMockSection.js';
-import { ProbeSection } from './sections/ProbeSection.js';
+import { MockWorkbench } from './MockWorkbench.js';
 
 const { Title, Text } = Typography;
 
@@ -54,12 +53,7 @@ export function ServerWorkbench({
   const sectionOptions = [
     { value: 'overview', label: '概览' },
     { value: 'basics', label: '基础' },
-    ...(http
-      ? [
-          { value: 'http-mock', label: 'HTTP·Mock' },
-          { value: 'probe', label: '试跑' },
-        ]
-      : []),
+    ...(http ? [{ value: 'http-mock', label: 'HTTP·Mock' }] : []),
   ];
 
   const activeSection = !http && isHttpOnlySection(section) ? 'overview' : section;
@@ -120,22 +114,18 @@ export function ServerWorkbench({
             server={server}
             runtime={runtime}
             onGoHttpMock={() => onSectionChange('http-mock')}
-            onGoProbe={() => onSectionChange('probe')}
           />
         )}
         {activeSection === 'basics' && (
           <BasicsSection server={server} onSave={onSaveBasics} />
         )}
         {http && activeSection === 'http-mock' && (
-          <HttpMockSection
+          <MockWorkbench
             server={server}
             onSave={onSaveMock}
             onUpdateRules={onUpdateMockRules}
             messageApi={messageApi}
           />
-        )}
-        {http && activeSection === 'probe' && (
-          <ProbeSection server={server} messageApi={messageApi} />
         )}
       </div>
     </div>

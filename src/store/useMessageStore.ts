@@ -3,7 +3,7 @@
  */
 import { create } from 'zustand';
 import type { SendMessageRequest, SavedMessage } from '../types/index';
-import { apiFetch } from '../api/client';
+import { api } from '../api';
 
 const SAVED_MESSAGES_KEY = 'ssm:savedMessages';
 
@@ -52,10 +52,7 @@ export const useMessageStore = create<MessageState>((set) => ({
   async sendMessage(req) {
     set({ sending: true, error: undefined });
     try {
-      await apiFetch('/send-message', {
-        method: 'POST',
-        body: JSON.stringify(req),
-      });
+      await api.clients.send(req);
     } catch (e) {
       set({ error: (e as Error).message });
       throw e;
@@ -67,10 +64,7 @@ export const useMessageStore = create<MessageState>((set) => ({
   async broadcast(req) {
     set({ sending: true, error: undefined });
     try {
-      await apiFetch('/client/send', {
-        method: 'POST',
-        body: JSON.stringify({ ...req, targetType: 'broadcast' }),
-      });
+      await api.clients.send({ ...req, targetType: 'broadcast' });
     } catch (e) {
       set({ error: (e as Error).message });
       throw e;

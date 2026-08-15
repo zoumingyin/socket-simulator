@@ -12,7 +12,7 @@ import {
   PlusOutlined, EditOutlined, DeleteOutlined,
   CheckCircleOutlined, StopOutlined,
 } from '@ant-design/icons';
-import type { EventConfig, EventStatus } from '../../types/index.js';
+import type { EventConfig } from '../../types/index.js';
 import { useEventStore } from '../../store/useEventStore.js';
 
 const { Title } = Typography;

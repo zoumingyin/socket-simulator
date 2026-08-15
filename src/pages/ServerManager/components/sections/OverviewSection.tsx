@@ -27,12 +27,10 @@ export function OverviewSection({
   server,
   runtime,
   onGoHttpMock,
-  onGoProbe,
 }: {
   server: ServerConfig;
   runtime?: ServerRuntime;
   onGoHttpMock: () => void;
-  onGoProbe: () => void;
 }): React.ReactElement {
   const { token } = theme.useToken();
   const running = runtime?.status === 'running';
@@ -95,8 +93,7 @@ export function OverviewSection({
         </Space>
         {http && (
           <Space style={{ marginTop: 12 }}>
-            <Button size="small" type="primary" ghost onClick={onGoHttpMock}>配置规则</Button>
-            <Button size="small" onClick={onGoProbe}>接口试跑</Button>
+            <Button size="small" type="primary" ghost onClick={onGoHttpMock}>配置规则 / 试跑</Button>
           </Space>
         )}
       </div>

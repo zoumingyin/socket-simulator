@@ -1,12 +1,16 @@
 /**
  * useServerStore - 服务管理 Zustand Store
- * 管理服务配置列表、运行时状态、加载状态
  *
- * 数据获取策略：初始加载使用 HTTP，后续更新全部通过 WebSocket 实时推送
+ * 管理两类数据，更新通道不同，切勿混淆：
+ * - 配置列表（servers: ServerConfig）：初始 HTTP 拉取（fetchServers），每次增删改后经
+ *   HTTP 写回并本地 set 乐观更新；**不**经 WebSocket 推送（后端无 server_update 事件）。
+ *   含 per-service Mock 配置（mockEnabled / mockRules / mockDefault*），同样走 HTTP 变更。
+ * - 运行时状态（runtimes: ServerRuntime）：首屏 HTTP 兜底（fetchRuntimes），之后由 Admin WS
+ *   的 runtime_update 事件持续推送覆盖，无需手动轮询。
  */
 import { create } from 'zustand';
 import type { ServerConfig, ServerRuntime } from '../types/index';
-import { apiFetch } from '../api/client';
+import { api } from '../api';
 import { adminSocket } from '../socket/AdminSocketManager';
 
 interface ServerState {
@@ -54,7 +58,7 @@ export const useServerStore = create<ServerState>((set, get) => ({
   async fetchServers() {
     set({ loading: true, error: undefined });
     try {
-      const res = await apiFetch<ServerConfig[]>('/server/list');
+      const res = await api.servers.list();
       set({ list: res.data ?? [], loading: false });
     } catch (e) {
       set({ error: (e as Error).message, loading: false });
@@ -65,7 +69,7 @@ export const useServerStore = create<ServerState>((set, get) => ({
     subscribeRuntimeUpdates();
     // HTTP 作为首次加载兜底
     try {
-      const res = await apiFetch<Record<string, ServerRuntime>>('/server/runtimes');
+      const res = await api.servers.runtimes();
       if (res.data) set({ runtimes: res.data });
     } catch {
       // 忽略 HTTP 失败，Socket 推送会更新数据
@@ -73,10 +77,7 @@ export const useServerStore = create<ServerState>((set, get) => ({
   },
 
   async addServer(config) {
-    const res = await apiFetch<ServerConfig>('/server/add', {
-      method: 'POST',
-      body: JSON.stringify(config),
-    });
+    const res = await api.servers.add(config);
     if (!res.data) throw new Error(res.error ?? '添加失败');
     set((s) => ({ list: [...s.list, res.data!] }));
     return res.data;
@@ -86,10 +87,7 @@ export const useServerStore = create<ServerState>((set, get) => ({
     const current = get().list.find((srv) => srv.id === id);
     if (!current) throw new Error('服务不存在');
     const next: ServerConfig = { ...current, ...patch, id };
-    const res = await apiFetch<ServerConfig>('/server/update', {
-      method: 'POST',
-      body: JSON.stringify(next),
-    });
+    const res = await api.servers.update(next);
     const saved = res.data ?? next;
     set((s) => ({
       list: s.list.map((srv) => (srv.id === id ? saved : srv)),
@@ -97,10 +95,7 @@ export const useServerStore = create<ServerState>((set, get) => ({
   },
 
   async removeServer(id) {
-    await apiFetch('/server/remove', {
-      method: 'POST',
-      body: JSON.stringify({ id }),
-    });
+    await api.servers.remove(id);
     set((s) => ({
       list: s.list.filter((srv) => srv.id !== id),
       runtimes: (() => { const { [id]: _, ...rest } = s.runtimes; return rest; })(),
@@ -108,37 +103,28 @@ export const useServerStore = create<ServerState>((set, get) => ({
   },
 
   async startServer(id) {
-    await apiFetch('/server/start', {
-      method: 'POST',
-      body: JSON.stringify({ id }),
-    });
+    await api.servers.start(id);
     // Socket 推送会自动更新 runtimes
   },
 
   async stopServer(id) {
-    await apiFetch(`/server/stop`, {
-      method: 'POST',
-      body: JSON.stringify({ id }),
-    });
+    await api.servers.stop(id);
   },
 
   async restartServer(id) {
-    await apiFetch(`/server/restart`, {
-      method: 'POST',
-      body: JSON.stringify({ id }),
-    });
+    await api.servers.restart(id);
   },
 
   async startAll() {
-    await apiFetch(`/server/start-all`, { method: 'POST' });
+    await api.servers.startAll();
   },
 
   async stopAll() {
-    await apiFetch(`/server/stop-all`, { method: 'POST' });
+    await api.servers.stopAll();
   },
 
   async restartAll() {
-    await apiFetch(`/server/restart-all`, { method: 'POST' });
+    await api.servers.restartAll();
   },
 
   async batchStart(ids: string[]) {

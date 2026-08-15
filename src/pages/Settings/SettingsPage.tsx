@@ -2,16 +2,15 @@
  * SettingsPage - 系统设置页面（优化版）
  * 使用 Tabs 组织设置项，提升用户体验
  */
-import React, { useEffect, useLayoutEffect, useMemo } from 'react';
+import React, { useEffect, useLayoutEffect } from 'react';
 import {
   Tabs, Form, Input, InputNumber, Switch, Button, Space,
   Typography, Upload, message, Card, Divider,
 } from 'antd';
 import { SaveOutlined, ImportOutlined, ExportOutlined, SettingOutlined } from '@ant-design/icons';
-import type { SystemSettings, WindowConfig } from '../../types/index.js';
 import { useSettingsStore } from '../../store/useSettingsStore.js';
 
-const { Title, Text, Paragraph } = Typography;
+const { Title, Paragraph } = Typography;
 const { TextArea } = Input;
 
 export function SettingsPage(): React.ReactElement {

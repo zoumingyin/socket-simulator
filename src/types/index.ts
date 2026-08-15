@@ -174,6 +174,9 @@ export interface SocketIOEventData {
 /** 客户端连接状态 */
 export type ClientStatus = 'connected' | 'disconnected';
 
+/** 客户端分组类型（对应 Rust ClientGroupType） */
+export type ClientGroupType = 'custom' | 'device' | 'user' | 'webpage';
+
 /** 客户端信息 */
 export interface ClientInfo {
   id: string;
@@ -184,6 +187,10 @@ export interface ClientInfo {
   lastActivityAt: string;
   protocol: ProtocolType;
   status: ClientStatus;
+  /** 客户端分组类型（对应 Rust ClientInfo.group） */
+  group?: ClientGroupType;
+  /** 客户端分组名（对应 Rust ClientInfo.group_name） */
+  groupName?: string;
   metadata?: Record<string, unknown>;
 }
 
@@ -245,22 +252,6 @@ export interface LogFilter {
 
 // ======================== 统计面板 ========================
 
-/** 实时统计 */
-export interface ServerStats {
-  serverId: string;
-  onlineClients: number;
-  totalConnections: number;
-  reconnectCount: number;
-  sentMessages: number;
-  receivedMessages: number;
-  sentBytes: number;
-  receivedBytes: number;
-  totalBytes: number;
-  sendRate: number;
-  receiveRate: number;
-  uptime: number;
-}
-
 /** 心跳配置 */
 export interface HeartbeatConfig {
   enabled: boolean;
@@ -313,31 +304,6 @@ export interface AppConfig {
   windowConfig: WindowConfig;
 }
 
-// ======================== 压力测试 ========================
-
-/** 压力测试配置 */
-export interface PressureTestConfig {
-  serverId: string;
-  concurrentConnections: number;
-  messageInterval: number;
-  messageCount: number;
-  messageSize: number;
-}
-
-/** 压力测试结果 */
-export interface PressureTestResult {
-  qps: number;
-  tps: number;
-  avgLatency: number;
-  p95Latency: number;
-  p99Latency: number;
-  failureRate: number;
-  totalMessages: number;
-  successfulMessages: number;
-  failedMessages: number;
-  duration: number;
-}
-
 // ======================== REST API ========================
 
 /** API 标准响应 */
@@ -364,111 +330,17 @@ export interface PaginatedResponse<T> {
   pageSize: number;
 }
 
-// ======================== MCP 工具 ========================
-
-/** MCP 工具定义 */
-export interface McpToolDefinition {
-  name: string;
-  description: string;
-  inputSchema: Record<string, unknown>;
-}
-
-/** MCP 调用结果 */
-export interface McpToolResult {
-  content: Array<{
-    type: string;
-    text: string;
-  }>;
-  isError?: boolean;
-}
-
-// ======================== 传输层抽象 ========================
-
-/** 传输层事件 */
-export interface TransportEvents {
-  connect: (client: ClientInfo) => void;
-  disconnect: (clientId: string, reason?: string) => void;
-  message: (clientId: string, event: string, data: unknown) => void;
-  error: (error: Error) => void;
-}
-
-/** 传输层接口（协议插件化） */
-export interface ITransport {
-  readonly protocol: ProtocolType;
-  on(event: string, handler: (...args: any[]) => void): this;
-  emit(event: string, ...args: any[]): boolean;
-  start(): Promise<void>;
-  stop(): Promise<void>;
-  send(clientId: string, event: string, data: unknown): Promise<void>;
-  broadcast(event: string, data: unknown, targetIds?: string[]): Promise<void>;
-  disconnectClient(clientId: string): Promise<void>;
-  getClients(): ClientInfo[];
-  isRunning(): boolean;
-}
-
 // ======================== 配置持久化 ========================
 
 /** 持久化配置集合 */
 export interface PersistedConfig {
   servers: ServerConfig[];
   events: EventConfig[];
+  /** 独立 Mock 服务列表（对应 Rust PersistedConfig.mock_services） */
+  mockServices?: MockServiceConfig[];
   systemSettings: SystemSettings;
   windowConfig: WindowConfig;
   version: string;
   exportedAt: string;
 }
 
-// ======================== 前端状态 ========================
-
-/** 前端全局状态 */
-export interface RootState {
-  servers: ServerState;
-  clients: ClientState;
-  events: EventState;
-  messages: MessageState;
-  logs: LogState;
-  settings: SettingsState;
-  stats: StatsState;
-}
-
-export interface ServerState {
-  list: ServerConfig[];
-  runtimes: Record<string, ServerRuntime>;
-  loading: boolean;
-  error?: string;
-}
-
-export interface ClientState {
-  list: ClientInfo[];
-  loading: boolean;
-  error?: string;
-}
-
-export interface EventState {
-  list: EventConfig[];
-  loading: boolean;
-  error?: string;
-}
-
-export interface MessageState {
-  sending: boolean;
-  error?: string;
-}
-
-export interface LogState {
-  entries: LogEntry[];
-  filter: LogFilter;
-  autoScroll: boolean;
-  loading: boolean;
-}
-
-export interface SettingsState {
-  systemSettings: SystemSettings;
-  windowConfig: WindowConfig;
-  loading: boolean;
-}
-
-export interface StatsState {
-  stats: Record<string, ServerStats>;
-  loading: boolean;
-}

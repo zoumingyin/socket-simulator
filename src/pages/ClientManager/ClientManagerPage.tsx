@@ -11,7 +11,7 @@ import { SearchOutlined, SendOutlined, DisconnectOutlined, TeamOutlined } from '
 import type { ClientInfo } from '../../types/index.js';
 import { useClientStore } from '../../store/useClientStore.js';
 
-const { Title, Text, Paragraph } = Typography;
+const { Title, Text } = Typography;
 const { Option } = Select;
 
 type ViewMode = 'table' | 'grouped';
@@ -46,13 +46,6 @@ export function ClientManagerPage(): React.ReactElement {
     return true;
   });
 
-  // 按服务分组
-  const groupedByServer = list.reduce((acc, client) => {
-    const key = client.serverId;
-    if (!acc[key]) acc[key] = [];
-    acc[key].push(client);
-    return acc;
-  }, {} as Record<string, ClientInfo[]>);
 
   const handleSend = async () => {
     try {

@@ -6,7 +6,7 @@
 
 import { create } from 'zustand';
 import type { ClientInfo, SendMessageRequest } from '../types/index';
-import { apiFetch } from '../api/client';
+import { api } from '../api';
 import { adminSocket } from '../socket/AdminSocketManager';
 
 interface ClientState {
@@ -43,8 +43,7 @@ export const useClientStore = create<ClientState>((set, get) => ({
     // HTTP 首次加载
     set({ loading: true, error: undefined });
     try {
-      const url = serverId ? `/api/clients?serverId=${serverId}` : '/api/clients';
-      const res = await apiFetch<ClientInfo[]>(url);
+      const res = await api.clients.list(serverId);
       set({ list: res.data ?? [], loading: false });
     } catch (e) {
       set({ error: (e as Error).message, loading: false });
@@ -52,24 +51,15 @@ export const useClientStore = create<ClientState>((set, get) => ({
   },
 
   async sendMessage(req) {
-    await apiFetch('/client/send', {
-      method: 'POST',
-      body: JSON.stringify(req),
-    });
+    await api.clients.send(req);
   },
 
   async broadcast(req) {
-    await apiFetch('/client/send', {
-      method: 'POST',
-      body: JSON.stringify({ ...req, targetType: 'broadcast' }),
-    });
+    await api.clients.send({ ...req, targetType: 'broadcast' });
   },
 
   async disconnectClient(serverId, clientId) {
-    await apiFetch(`/client/disconnect`, {
-      method: 'POST',
-      body: JSON.stringify({ clientId: `${serverId}___${clientId}` }),
-    });
+    await api.clients.disconnect(`${serverId}___${clientId}`);
     set((s) => ({ list: s.list.filter((c) => c.id !== clientId) }));
   },
 

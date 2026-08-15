@@ -15,7 +15,6 @@ import {
   Typography,
   App as AntApp,
   Switch,
-  message,
 } from "antd";
 import { SunOutlined, MoonOutlined } from "@ant-design/icons";
 import "./responsive.css";
@@ -44,7 +43,8 @@ import { MessageCenterPage } from "./pages/MessageCenter/MessageCenterPage.jsx";
 import { LogViewerPage } from "./pages/LogViewer/LogViewerPage.jsx";
 import { SettingsPage } from "./pages/Settings/SettingsPage.jsx";
 import { adminSocket } from "./socket/AdminSocketManager.js";
-import { apiFetch } from "./api/client.js";
+import { bootstrapCore } from "./store/bootstrap.js";
+import { useTrayBridge } from "./hooks/useTrayBridge.js";
 
 const menuItems = [
   { key: "/", icon: <DashboardOutlined />, label: "仪表盘" },
@@ -67,6 +67,10 @@ function AppLayout(): React.ReactElement {
     // 全局唯一 WebSocket 连接 — 整个应用生命周期只建立一次
     adminSocket.connect();
 
+    // 应用级核心数据预热：先拉取 servers/runtimes/clients/events/settings，
+    // 消除各页（尤其消息中心）进入时的空数据竞态。幂等，重复调用安全。
+    void bootstrapCore();
+
     return () => {
       adminSocket.disconnect();
     };
@@ -81,96 +85,8 @@ function AppLayout(): React.ReactElement {
     }
   }, [themeMode]);
 
-  // 监听托盘菜单事件（仅 Tauri 桌面环境）
-  useEffect(() => {
-    let cancelled = false;
-    let unlistenFns: (() => void)[] = [];
-
-    const setupTrayListeners = async () => {
-      try {
-        // 动态导入 Tauri event API（非 Tauri 环境下会失败）
-        const { listen } = await import("@tauri-apps/api/event");
-
-        if (cancelled) return;
-
-        // 启动全部服务
-        const unlistenStart = await listen("tray-start-all", async () => {
-          message.info("正在启动全部服务...");
-          try {
-            const res = await apiFetch("/api/server/start-all", {
-              method: "POST",
-            });
-            if (res.success) {
-              message.success("全部服务启动成功");
-            } else {
-              message.error(`启动失败: ${res.error || "未知错误"}`);
-            }
-          } catch (err: unknown) {
-            const error = err instanceof Error ? err : new Error(String(err));
-            message.error(`启动失败: ${error.message}`);
-          }
-        });
-
-        if (cancelled) {
-          unlistenStart();
-          return;
-        }
-
-        // 停止全部服务
-        const unlistenStop = await listen("tray-stop-all", async () => {
-          message.info("正在停止全部服务...");
-          try {
-            const res = await apiFetch("/api/server/stop-all", {
-              method: "POST",
-            });
-            if (res.success) {
-              message.success("全部服务停止成功");
-            } else {
-              message.error(`停止失败: ${res.error || "未知错误"}`);
-            }
-          } catch (err: unknown) {
-            const error = err instanceof Error ? err : new Error(String(err));
-            message.error(`停止失败: ${error.message}`);
-          }
-        });
-
-        if (cancelled) {
-          unlistenStop();
-          return;
-        }
-
-        // 重启全部服务
-        const unlistenRestart = await listen("tray-restart-all", async () => {
-          message.info("正在重启全部服务...");
-          try {
-            const res = await apiFetch("/api/server/restart-all", {
-              method: "POST",
-            });
-            if (res.success) {
-              message.success("全部服务重启成功");
-            } else {
-              message.error(`重启失败: ${res.error || "未知错误"}`);
-            }
-          } catch (err: unknown) {
-            const error = err instanceof Error ? err : new Error(String(err));
-            message.error(`重启失败: ${error.message}`);
-          }
-        });
-
-        unlistenFns = [unlistenStart, unlistenStop, unlistenRestart];
-      } catch {
-        // 非 Tauri 环境（浏览器开发），忽略
-        return;
-      }
-    };
-
-    setupTrayListeners();
-
-    return () => {
-      cancelled = true;
-      unlistenFns.forEach((fn) => fn());
-    };
-  }, []);
+  // 托盘菜单事件（Tauri 桌面环境）抽为独立 hook，保持布局组件整洁
+  useTrayBridge();
 
   const isDark = themeMode === "dark";
   const algorithm = isDark ? theme.darkAlgorithm : theme.defaultAlgorithm;

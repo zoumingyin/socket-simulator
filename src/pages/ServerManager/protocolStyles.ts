@@ -20,8 +20,8 @@ export function isHttpService(protocol: ProtocolType | string): boolean {
   return protocol === 'http';
 }
 
-export type WorkbenchSection = 'overview' | 'basics' | 'http-mock' | 'probe';
+export type WorkbenchSection = 'overview' | 'basics' | 'http-mock';
 
 export function isHttpOnlySection(section: WorkbenchSection): boolean {
-  return section === 'http-mock' || section === 'probe';
+  return section === 'http-mock';
 }

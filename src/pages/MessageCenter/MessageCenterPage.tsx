@@ -6,17 +6,17 @@
 import React, { useEffect, useState } from 'react';
 import {
   Card, Space, Typography, Radio, Input, Button, Select,
-  Switch, Divider, Tag, List, Empty, Popconfirm,
+  Tag, List, Empty, Popconfirm,
   message,
 } from 'antd';
 import { SendOutlined, FormatPainterOutlined, CheckCircleOutlined, CompressOutlined, SaveOutlined, DeleteOutlined } from '@ant-design/icons';
-import type { MessageType, SendMessageRequest, MessageTargetType, SavedMessage } from '../../types/index.js';
+import type { MessageType, MessageTargetType, SavedMessage } from '../../types/index.js';
 import { useMessageStore } from '../../store/useMessageStore.js';
 import { useClientStore } from '../../store/useClientStore.js';
 import { useServerStore } from '../../store/useServerStore.js';
 import { useEventStore } from '../../store/useEventStore.js';
 
-const { Title, Text, Paragraph } = Typography;
+const { Title, Text } = Typography;
 const { TextArea } = Input;
 
 export function MessageCenterPage(): React.ReactElement {

@@ -6,7 +6,7 @@
 
 import { create } from 'zustand';
 import type { LogEntry, LogFilter } from '../types/index';
-import { apiFetch } from '../api/client';
+import { api, apiFetch } from '../api';
 import { adminSocket } from '../socket/AdminSocketManager';
 
 const MAX_ENTRIES = 2000;
@@ -58,13 +58,8 @@ export const useLogStore = create<LogState>((set, get) => ({
     // HTTP 作为首次加载兜底
     set({ loading: true, error: undefined });
     try {
-      const params = new URLSearchParams();
       const f = filter ?? get().filter;
-      if (f.serverId) params.set('serverId', f.serverId);
-      if (f.level) params.set('level', f.level);
-      if (f.keyword) params.set('keyword', f.keyword);
-      const qs = params.toString();
-      const res = await apiFetch<LogEntry[]>(`/api/logs${qs ? '?' + qs : ''}`);
+      const res = await api.logs.list(f);
       set({ entries: res.data ?? [], loading: false });
     } catch (e) {
       set({ error: (e as Error).message, loading: false });
@@ -105,7 +100,7 @@ export const useLogStore = create<LogState>((set, get) => ({
   },
 
   async clearLogs() {
-    await apiFetch('/api/logs/clear', { method: 'POST' });
+    await api.logs.clear();
     set({ entries: [] });
   },
 }));
