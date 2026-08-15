@@ -6,7 +6,6 @@
 
 use std::net::SocketAddr;
 use std::sync::Arc;
-use std::time::Duration;
 
 use axum::body::{to_bytes, Body};
 use axum::extract::connect_info::ConnectInfo;
@@ -19,11 +18,11 @@ use axum::Router;
 use tower_http::cors::CorsLayer;
 
 use crate::backend::constants::*;
-use crate::backend::net::port_release::release_port;
+use crate::backend::net::bind::bind_with_release;
 use crate::backend::types::{MockServiceConfig, SystemSettings};
 
-use super::matcher::match_rule;
-use super::responder::{default_response, json_error_response, rule_response};
+use super::engine::{MockEndpoint, MockRequest};
+use super::responder::json_error_response;
 
 const MAX_BODY_SIZE: usize = 16 * 1024 * 1024; // 16MB
 
@@ -36,15 +35,11 @@ pub struct MockAppState {
 
 impl MockAppState {
     fn allow_ip(&self, ip: &str) -> bool {
-        let wl = &self.sys.ip_access.whitelist;
-        let bl = &self.sys.ip_access.blacklist;
-        if bl.iter().any(|b| b == ip) {
-            return false;
-        }
-        if !wl.is_empty() && !wl.iter().any(|w| w == ip) {
-            return false;
-        }
-        true
+        crate::backend::net::ip_access::allow_ip(
+            &self.sys.ip_access.whitelist,
+            &self.sys.ip_access.blacklist,
+            ip,
+        )
     }
 }
 
@@ -72,19 +67,9 @@ impl MockServer {
         sys: SystemSettings,
         port: u16,
     ) -> Result<tokio::sync::oneshot::Sender<()>, String> {
-        let addr = ("127.0.0.1", port);
-        let listener = match tokio::net::TcpListener::bind(addr).await {
-            Ok(l) => l,
-            Err(e) if e.kind() == std::io::ErrorKind::AddrInUse => {
-                eprintln!("[MockServer] 端口 {} 被占用，尝试释放后重试", port);
-                release_port(port);
-                tokio::time::sleep(Duration::from_millis(PORT_RELEASE_RETRY_DELAY_MS)).await;
-                tokio::net::TcpListener::bind(addr)
-                    .await
-                    .map_err(|e| format!("端口 {} 绑定失败: {}", port, e))?
-            }
-            Err(e) => return Err(format!("端口 {} 绑定失败: {}", port, e)),
-        };
+        let listener = bind_with_release("127.0.0.1", port)
+            .await
+            .map_err(|e| format!("端口 {} 绑定失败: {}", port, e))?;
         let app = Self::build_router(cfg, sys).into_make_service_with_connect_info::<SocketAddr>();
         let (tx, rx) = tokio::sync::oneshot::channel::<()>();
         tokio::spawn(async move {
@@ -123,11 +108,15 @@ async fn mock_handler(State(state): State<MockAppState>, req: Request) -> Respon
     dispatch(cfg, &sys, req).await
 }
 
-/// 纯函数 dispatch：剥离 base_path → 规则匹配 → 响应
+/// 纯函数 dispatch：剥离 base_path → 交给 MockEngine 匹配/响应
 pub async fn dispatch(cfg: &MockServiceConfig, sys: &SystemSettings, req: Request) -> Response {
-    // IP 黑白名单检查
+    // IP 黑白名单检查（统一实现见 `crate::backend::net::ip_access`）
     if let Some(addr) = req.extensions().get::<ConnectInfo<SocketAddr>>().cloned() {
-        if !allow_ip_simple(&sys.ip_access.whitelist, &sys.ip_access.blacklist, &addr.ip().to_string()) {
+        if !crate::backend::net::ip_access::allow_ip(
+            &sys.ip_access.whitelist,
+            &sys.ip_access.blacklist,
+            &addr.ip().to_string(),
+        ) {
             return json_error_response(
                 StatusCode::FORBIDDEN,
                 "Forbidden",
@@ -136,47 +125,31 @@ pub async fn dispatch(cfg: &MockServiceConfig, sys: &SystemSettings, req: Reques
         }
     }
 
-    // 在 into_parts 前先把只读数据拷出来
     let method = req.method().as_str().to_string();
     let full_path = req.uri().path().to_string();
     let query_q = req.uri().query().map(|s| s.to_string());
-
     let relative = strip_base(&full_path, &cfg.base_path);
     let query_map = parse_query(query_q.as_deref());
 
     let (parts, body) = req.into_parts();
     let body_bytes = to_bytes(body, MAX_BODY_SIZE).await.unwrap_or_default();
 
-    // 按规则顺序匹配
-    for rule in &cfg.rules {
-        if match_rule(rule, &method, &relative, &parts.headers, &query_map, &body_bytes).is_some() {
-            if rule.response_delay_ms > 0 {
-                tokio::time::sleep(Duration::from_millis(rule.response_delay_ms as u64)).await;
-            }
-            return rule_response(
-                rule.response_status_code,
-                &rule.response_headers,
-                &rule.response_body,
-                rule.response_delay_ms,
-            );
-        }
-    }
-
-    if cfg.default_delay_ms > 0 {
-        tokio::time::sleep(Duration::from_millis(cfg.default_delay_ms as u64)).await;
-    }
-    default_response(cfg)
+    let endpoint = MockEndpoint {
+        rules: cfg.rules.clone(),
+        default_status_code: cfg.default_status_code,
+        default_response_body: cfg.default_response_body.clone(),
+        default_delay_ms: cfg.default_delay_ms,
+    };
+    let req_meta = MockRequest {
+        method: &method,
+        path: &relative,
+        headers: &parts.headers,
+        query: &query_map,
+        body: &body_bytes,
+    };
+    crate::backend::mock::engine::dispatch(&endpoint, &req_meta).await
 }
 
-fn allow_ip_simple(wl: &[String], bl: &[String], ip: &str) -> bool {
-    if bl.iter().any(|b| b == ip) {
-        return false;
-    }
-    if !wl.is_empty() && !wl.iter().any(|w| w == ip) {
-        return false;
-    }
-    true
-}
 
 fn strip_base(full: &str, base: &str) -> String {
     let base = base.trim_end_matches('/');

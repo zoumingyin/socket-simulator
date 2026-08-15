@@ -5,7 +5,6 @@
 
 use axum::routing::{get, post};
 use axum::Router;
-use tower_http::cors::CorsLayer;
 
 use crate::backend::api::handlers;
 use crate::backend::constants::ADMIN_WS_PATH;
@@ -51,6 +50,5 @@ pub fn build_router(state: AppState) -> Router {
         .route("/api/mock/start", post(handlers::mock_start))
         .route("/api/mock/stop", post(handlers::mock_stop))
         .route(ADMIN_WS_PATH, get(admin::admin_ws))
-        .layer(CorsLayer::permissive())
         .with_state(state)
 }

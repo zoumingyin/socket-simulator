@@ -26,9 +26,9 @@ use hyper_util::service::TowerToHyperService;
 
 use crate::backend::constants::*;
 use crate::backend::error::BackendError;
-use crate::backend::net::port_release::release_port;
+use crate::backend::net::bind::bind_with_release;
 use crate::backend::transport::Transport;
-use crate::backend::transport::websocket::TransportHooks;
+use crate::backend::transport::hooks::TransportHooks;
 use crate::backend::types::now_rfc3339;
 use crate::backend::types::*;
 
@@ -72,20 +72,7 @@ impl Transport for SocketIoServer {
         }
 
         // 1) 绑定监听（端口冲突时释放占用进程后重试，与 WsServer 行为一致）
-        let addr = (self.cfg.ip.as_str(), self.cfg.port as u16);
-        let listener = match TcpListener::bind(addr).await {
-            Ok(l) => l,
-            Err(e) if e.kind() == std::io::ErrorKind::AddrInUse => {
-                eprintln!(
-                    "[SocketIoServer] 端口 {} 被占用，尝试释放后重试",
-                    self.cfg.port
-                );
-                release_port(self.cfg.port as u16);
-                tokio::time::sleep(Duration::from_millis(PORT_RELEASE_RETRY_DELAY_MS)).await;
-                TcpListener::bind(addr).await?
-            }
-            Err(e) => return Err(e.into()),
-        };
+        let listener = bind_with_release(self.cfg.ip.as_str(), self.cfg.port as u16).await?;
 
         // 2) 创建 Socket.IO 层与服务（standalone：非 socket.io 请求返回 404）
         let (service, io) = SocketIo::new_svc();

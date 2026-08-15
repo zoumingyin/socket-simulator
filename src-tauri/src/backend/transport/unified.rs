@@ -10,13 +10,15 @@
 //!   （规则匹配 → 返回预设模拟响应）
 //!
 //! ## 路由优先级
-//! 1. 显式注册的 HTTP transport 路由（inbound/stream，仅 protocol=http 时）
+//! 1. 显式注册的 HTTP transport 路由（inbound/stream，仅 protocol=http 时，由共享 `http_routing` 构建）
 //! 2. Fallback 统一处理器（WS 升级检测 → Mock dispatch）
+//! 3. IP 黑白名单中间件（最外层，覆盖全部路由与 fallback）
+//! 4. CORS（最外层）
 //!
 //! ## 互不干扰保证
 //! - WebSocket 连接的 error/timeout/disconnect 逻辑完全独立（与 WsServer 一致）
 //! - Mock HTTP 的 error/delay 逻辑完全独立（与 MockServer dispatch 一致）
-//! - 两者在同一个 Router 的不同分支中执行，不共享状态
+//! - 两者在同一个 Router 的不同分支中执行，不共享可变状态
 //!
 //! ## 配置项（ServerConfig 中的 mock_* 字段）
 //! - `mock_enabled: bool` — 是否启用统一路由模式
@@ -29,27 +31,28 @@
 //! Socket.IO 使用 hyper 1.0 原生服务，无法直接集成到 axum 0.7 Router 中。
 //! 当 `protocol=socket.io` 时，即使 `mock_enabled=true` 也仅启动 Socket.IO 传输层，
 //! Mock HTTP 不生效（日志会打印警告）。
+//!
+//! ## 复用说明
+//! HTTP transport 的路由构建与 ingress/stream/SSE 处理器、查询串解析、IP 中间件
+//! 均收敛于 `transport::http_routing`（与 `HttpServer` 共用），本模块仅实现
+//! `HttpRouteState` 并保留 axum-WS 连接循环（与 `WsServer` 的 `tokio_tungstenite`
+//! 属于不同 WS 库，无法共享）。
 
 use std::collections::HashMap;
-use std::convert::Infallible;
 use std::net::SocketAddr;
-use std::pin::Pin;
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::{Arc, Mutex, Weak};
-use std::task::{Context, Poll};
-use std::time::Duration;
+use std::sync::{Arc, Mutex};
 
 use axum::body::to_bytes;
 use axum::extract::connect_info::ConnectInfo;
 use axum::extract::ws::{Message, WebSocket, WebSocketUpgrade};
-use axum::extract::{MatchedPath, Path, Request, State};
+use axum::extract::{Request, State};
 use axum::http::StatusCode;
-use axum::response::sse::{Event as SseEvent, KeepAlive, Sse};
+use axum::middleware::from_fn_with_state;
+use axum::response::sse::Event as SseEvent;
 use axum::response::{IntoResponse, Response};
-use axum::routing::MethodRouter;
-use axum::middleware::{from_fn_with_state, Next};
 use axum::Router;
-use futures_util::{SinkExt, Stream, StreamExt};
+use futures_util::{SinkExt, StreamExt};
 use serde_json::Value;
 use tokio::net::TcpListener;
 use tokio::sync::{mpsc, Notify};
@@ -57,13 +60,14 @@ use tokio::sync::{mpsc, Notify};
 
 use crate::backend::constants::*;
 use crate::backend::error::BackendError;
-use crate::backend::mock::matcher::match_rule;
-use crate::backend::mock::responder::{
-    default_response, json_error_response, rule_response,
+use crate::backend::mock::engine::{MockEndpoint, MockRequest};
+use crate::backend::mock::responder::json_error_response;
+use crate::backend::net::bind::bind_with_release;
+use crate::backend::transport::http_routing::{
+    self, build_http_router, default_http_routes, HttpRouteState, ip_guard, parse_query, SseTx,
 };
-use crate::backend::net::port_release::release_port;
 use crate::backend::transport::Transport;
-use crate::backend::transport::websocket::TransportHooks;
+use crate::backend::transport::hooks::TransportHooks;
 use crate::backend::types::*;
 
 use nanoid::nanoid;
@@ -71,13 +75,13 @@ use tower_http::cors::CorsLayer;
 
 const MAX_BODY_SIZE: usize = 16 * 1024 * 1024; // 16MB
 
-/// SSE 客户端外发消息发送端（复用 HttpServer 的设计）
-type SseTx = mpsc::UnboundedSender<SseEvent>;
-
 /// 统一路由共享状态
 ///
 /// 同时承载 Socket 传输层和 Mock HTTP 引擎所需的状态。
 /// 两者在 fallback handler 中通过请求类型自动分发，互不共享可变状态。
+///
+/// `HttpRouteState` 的实现把 HTTP transport 所需的 hooks/routes/sse 等字段暴露给
+/// 共享的 `http_routing` 处理器；IP 过滤与 Mock 分发逻辑仍在本模块内。
 #[derive(Clone)]
 pub struct UnifiedState {
     // ---------- Socket 传输层状态 ----------
@@ -107,18 +111,35 @@ pub struct UnifiedState {
     pub mock_default_delay_ms: u32,
 }
 
-impl UnifiedState {
-    /// IP 黑白名单过滤（与 WsServer/HttpServer 一致）
+impl HttpRouteState for UnifiedState {
+    fn hooks(&self) -> &TransportHooks {
+        &self.hooks
+    }
+    fn routes(&self) -> &Arc<HashMap<String, HttpRouteConfig>> {
+        &self.routes
+    }
+    fn server_id(&self) -> &str {
+        &self.cfg.id
+    }
+    fn protocol(&self) -> ProtocolType {
+        self.cfg.protocol
+    }
+    fn sse_clients(&self) -> &Arc<Mutex<HashMap<String, SseTx>>> {
+        &self.sse_clients
+    }
     fn allow_ip(&self, ip: &str) -> bool {
-        let wl = &self.sys.ip_access.whitelist;
-        let bl = &self.sys.ip_access.blacklist;
-        if bl.iter().any(|b| b == ip) {
-            return false;
-        }
-        if !wl.is_empty() && !wl.iter().any(|w| w == ip) {
-            return false;
-        }
-        true
+        crate::backend::net::ip_access::allow_ip(
+            &self.sys.ip_access.whitelist,
+            &self.sys.ip_access.blacklist,
+            ip,
+        )
+    }
+    fn ip_denied(&self, ip: &str) -> Response {
+        json_error_response(
+            StatusCode::FORBIDDEN,
+            "Forbidden",
+            &format!("IP address {} is not allowed", ip),
+        )
     }
 }
 
@@ -130,7 +151,7 @@ impl UnifiedState {
 /// - Mock HTTP 响应（普通 HTTP 请求 → 规则匹配 → 模拟响应）
 ///
 /// 三者通过 axum Router 的路由优先级和 fallback handler 自动区分：
-/// 1. 显式 HTTP transport 路由优先匹配
+/// 1. 显式 HTTP transport 路由优先匹配（共享 `http_routing` 构建）
 /// 2. 未匹配的请求进入 fallback：检测 WS 升级头 → WS 或 Mock
 pub struct UnifiedServer {
     cfg: ServerConfig,
@@ -140,18 +161,11 @@ pub struct UnifiedServer {
     sse_clients: Arc<Mutex<HashMap<String, SseTx>>>,
     running: Arc<AtomicBool>,
     shutdown: Mutex<Option<Arc<Notify>>>,
-    /// 自引用弱指针（供 WS 连接处理任务获取 Arc<Self>）
-    self_ref: Weak<UnifiedServer>,
 }
 
 impl UnifiedServer {
-    /// 构造（通过 `Arc::new_cyclic` 注入 self 弱引用）
-    pub fn new(
-        cfg: ServerConfig,
-        sys: SystemSettings,
-        hooks: TransportHooks,
-        weak: Weak<UnifiedServer>,
-    ) -> Self {
+    /// 构造
+    pub fn new(cfg: ServerConfig, sys: SystemSettings, hooks: TransportHooks) -> Self {
         Self {
             cfg,
             sys,
@@ -160,59 +174,22 @@ impl UnifiedServer {
             sse_clients: Arc::new(Mutex::new(HashMap::new())),
             running: Arc::new(AtomicBool::new(false)),
             shutdown: Mutex::new(None),
-            self_ref: weak,
         }
-    }
-
-    /// 把用户路径中的 `{name}` 占位符转换为 axum 的 `:name` 语法
-    fn to_axum_path(p: &str) -> String {
-        p.split('/')
-            .map(|seg| {
-                if seg.starts_with('{') && seg.ends_with('}') && seg.len() > 2 {
-                    format!(":{}", &seg[1..seg.len() - 1])
-                } else {
-                    seg.to_string()
-                }
-            })
-            .collect::<Vec<_>>()
-            .join("/")
-    }
-
-    /// 内置默认 HTTP transport 路由（http_routes 为空时使用）
-    fn default_http_routes() -> Vec<HttpRouteConfig> {
-        vec![
-            HttpRouteConfig {
-                id: "__default_inbound".to_string(),
-                method: HttpMethod::Post,
-                path: "/{event}".to_string(),
-                route_type: HttpRouteType::Inbound,
-                event: None,
-                description: Some("默认入站 POST /{event}".to_string()),
-            },
-            HttpRouteConfig {
-                id: "__default_stream".to_string(),
-                method: HttpMethod::Get,
-                path: "/stream".to_string(),
-                route_type: HttpRouteType::Stream,
-                event: None,
-                description: Some("默认 SSE 推送 GET /stream".to_string()),
-            },
-        ]
     }
 
     /// 构建统一路由
     ///
     /// 路由结构（按优先级从高到低）：
-    /// 1. HTTP transport 显式路由（inbound/stream，仅 protocol=http 时注册）
+    /// 1. HTTP transport 显式路由（inbound/stream，仅 protocol=http 时注册，由共享 `http_routing` 构建）
     /// 2. Fallback → `unified_fallback`（检测 WS 升级 → WS handler；否则 → Mock dispatch）
-    /// 3. IP 黑白名单中间件（最外层）
+    /// 3. IP 黑白名单中间件（最外层，覆盖全部路由与 fallback）
     /// 4. CORS（最外层）
     fn build_router(&self) -> Router {
         // 选生效 HTTP transport 路由：仅 http 协议时注册
         let effective_http_routes: Vec<HttpRouteConfig> =
             if self.cfg.protocol == ProtocolType::Http {
                 if self.cfg.http_routes.is_empty() {
-                    Self::default_http_routes()
+                    default_http_routes()
                 } else {
                     self.cfg.http_routes.clone()
                 }
@@ -220,83 +197,24 @@ impl UnifiedServer {
                 Vec::new()
             };
 
-        // routes 映射：key = "METHOD /axum/path"
-        let mut routes_map: HashMap<String, HttpRouteConfig> = HashMap::new();
-        for r in &effective_http_routes {
-            let key = format!("{} {}", r.method.as_str(), Self::to_axum_path(&r.path));
-            routes_map.insert(key, r.clone());
-        }
-
         let state = UnifiedState {
             ws_clients: self.ws_clients.clone(),
             sse_clients: self.sse_clients.clone(),
             hooks: self.hooks.clone(),
             cfg: self.cfg.clone(),
             sys: self.sys.clone(),
-            routes: Arc::new(routes_map),
+            routes: Arc::new(http_routing::build_routes_map(&effective_http_routes)),
             mock_enabled: self.cfg.mock_enabled,
             mock_rules: Arc::new(self.cfg.mock_rules.clone()),
             mock_default_status_code: self.cfg.mock_default_status_code,
             mock_default_response_body: self.cfg.mock_default_response_body.clone(),
             mock_default_delay_ms: self.cfg.mock_default_delay_ms,
         };
-        let ip_state = state.clone();
 
-        // 按路径分组注册 HTTP transport 路由
-        let mut inbound_by_path: HashMap<String, Vec<HttpMethod>> = HashMap::new();
-        let mut stream_by_path: HashMap<String, Vec<HttpMethod>> = HashMap::new();
-        for r in &effective_http_routes {
-            let axum_path = Self::to_axum_path(&r.path);
-            let bucket = if r.route_type == HttpRouteType::Stream {
-                &mut stream_by_path
-            } else {
-                &mut inbound_by_path
-            };
-            let v = bucket.entry(axum_path).or_default();
-            if !v.contains(&r.method) {
-                v.push(r.method);
-            }
-        }
-
-        let mut router: Router<UnifiedState> = Router::new();
-        for (path, methods) in inbound_by_path {
-            let mut mr: MethodRouter<UnifiedState> = MethodRouter::new();
-            for m in methods {
-                mr = match m {
-                    HttpMethod::Get => mr.get(http_ingress_handler),
-                    HttpMethod::Post => mr.post(http_ingress_handler),
-                    HttpMethod::Put => mr.put(http_ingress_handler),
-                    HttpMethod::Delete => mr.delete(http_ingress_handler),
-                    HttpMethod::Patch => mr.patch(http_ingress_handler),
-                    HttpMethod::Head => mr.head(http_ingress_handler),
-                    HttpMethod::Options => mr.options(http_ingress_handler),
-                    HttpMethod::Any => continue,
-                };
-            }
-            router = router.route(&path, mr);
-        }
-        for (path, methods) in stream_by_path {
-            let mut mr: MethodRouter<UnifiedState> = MethodRouter::new();
-            for m in methods {
-                mr = match m {
-                    HttpMethod::Get => mr.get(http_stream_handler),
-                    HttpMethod::Post => mr.post(http_stream_handler),
-                    HttpMethod::Put => mr.put(http_stream_handler),
-                    HttpMethod::Delete => mr.delete(http_stream_handler),
-                    HttpMethod::Patch => mr.patch(http_stream_handler),
-                    HttpMethod::Head => mr.head(http_stream_handler),
-                    HttpMethod::Options => mr.options(http_stream_handler),
-                    HttpMethod::Any => continue,
-                };
-            }
-            router = router.route(&path, mr);
-        }
-
-        // Fallback：统一处理器（WS 升级 → Socket；否则 → Mock HTTP）
-        router
+        build_http_router(effective_http_routes, state.clone())
             .fallback(unified_fallback)
-            .layer(from_fn_with_state(ip_state, ip_guard))
             .layer(CorsLayer::permissive())
+            .layer(from_fn_with_state(state.clone(), ip_guard::<UnifiedState>))
             .with_state(state)
     }
 }
@@ -356,12 +274,7 @@ async fn unified_fallback(
 /// - 写错误 → 断开
 /// - 客户端主动关闭 → 清理
 /// - 服务端 stop → 清空 clients → 各连接因 out_rx 关闭而结束
-async fn handle_ws_connection(
-    state: UnifiedState,
-    socket: WebSocket,
-    raw_id: String,
-    ip: String,
-) {
+async fn handle_ws_connection(state: UnifiedState, socket: WebSocket, raw_id: String, ip: String) {
     let (mut write, mut read) = socket.split();
     let (out_tx, mut out_rx) = mpsc::channel::<Message>(64);
     state.ws_clients.lock().unwrap().insert(raw_id.clone(), out_tx);
@@ -434,237 +347,47 @@ async fn handle_ws_connection(
     (state.hooks.on_disconnect)(raw_id);
 }
 
-// ==================== Mock HTTP 引擎（与 MockServer.dispatch 一致） ====================
+// ==================== Mock HTTP 引擎 ====================
 
 /// Mock HTTP 分发 —— 纯函数，处理普通 HTTP 请求
 ///
 /// 独立的 error/delay 逻辑：
 /// - 规则命中延迟 → tokio::sleep
 /// - 默认延迟 → tokio::sleep
-/// - 未启用 → 404 JSON 错误
-/// - IP 禁止 → 403 JSON 错误
+/// - 未启用 → 404 JSON 错误（由 `unified_fallback` 处理）
+/// - IP 禁止 → 由最外层 `ip_guard` 中间件拦截
 ///
 /// 与 WS 连接处理完全隔离，不共享可变状态。
+///
+/// 注：规则匹配与 `MockServer::dispatch` 一致，但保留 `rule.enabled` 过滤
+/// （unified 模式下用户可在 UI 临时禁用某条规则，而独立 Mock 服务不暴露该开关）。
+/// 查询串解析复用 `http_routing::parse_query`。
 async fn mock_dispatch(state: &UnifiedState, req: Request) -> Response {
     // 在 into_parts 前拷出只读数据
     let method = req.method().as_str().to_string();
     let full_path = req.uri().path().to_string();
     let query_q = req.uri().query().map(|s| s.to_string());
-
     let query_map = parse_query(query_q.as_deref());
 
     let (parts, body) = req.into_parts();
     let body_bytes = to_bytes(body, MAX_BODY_SIZE).await.unwrap_or_default();
 
-    // 按规则顺序匹配
-    for rule in state.mock_rules.iter() {
-        if !rule.enabled {
-            continue;
-        }
-        if match_rule(rule, &method, &full_path, &parts.headers, &query_map, &body_bytes)
-            .is_some()
-        {
-            if rule.response_delay_ms > 0 {
-                tokio::time::sleep(Duration::from_millis(rule.response_delay_ms as u64)).await;
-            }
-            return rule_response(
-                rule.response_status_code,
-                &rule.response_headers,
-                &rule.response_body,
-                rule.response_delay_ms,
-            );
-        }
-    }
-
-    // 未匹配规则 → 默认响应
-    if state.mock_default_delay_ms > 0 {
-        tokio::time::sleep(Duration::from_millis(state.mock_default_delay_ms as u64)).await;
-    }
-
-    // 构造临时 MockServiceConfig 以复用 default_response
-    let tmp_cfg = MockServiceConfig {
+    // 共端口：规则匹配用的 path 即请求完整路径（无 base_path 概念）；
+    // 规则级 enabled 过滤由 MockEngine 内部的 match_rule 统一处理。
+    let endpoint = MockEndpoint {
+        rules: state.mock_rules.as_ref().clone(),
         default_status_code: state.mock_default_status_code,
         default_response_body: state.mock_default_response_body.clone(),
         default_delay_ms: state.mock_default_delay_ms,
-        ..Default::default()
     };
-    default_response(&tmp_cfg)
-}
-
-// ==================== HTTP Transport 路由处理器 ====================
-
-/// HTTP 入站消息处理器（与 HttpServer.ingress_handler 一致）
-async fn http_ingress_handler(
-    State(state): State<UnifiedState>,
-    params: Path<HashMap<String, String>>,
-    req: Request,
-) -> Response {
-    let method = req.method().as_str().to_uppercase();
-    let matched = req
-        .extensions()
-        .get::<MatchedPath>()
-        .map(|m| m.as_str().to_string());
-    let route = matched
-        .as_ref()
-        .and_then(|p| state.routes.get(&format!("{} {}", method, p)));
-
-    let event = route
-        .and_then(|r| r.event.clone())
-        .or_else(|| params.get("event").cloned())
-        .or_else(|| {
-            req.uri()
-                .path()
-                .trim_end_matches('/')
-                .rsplit('/')
-                .next()
-                .filter(|s| !s.is_empty())
-                .map(|s| s.to_string())
-        })
-        .unwrap_or_else(|| "message".to_string());
-
-    let data: Value = match to_bytes(req.into_body(), usize::MAX).await {
-        Ok(b) if !b.is_empty() => serde_json::from_slice(&b)
-            .unwrap_or_else(|_| Value::String(String::from_utf8_lossy(&b).to_string())),
-        _ => Value::Null,
+    let req_meta = MockRequest {
+        method: &method,
+        path: &full_path,
+        headers: &parts.headers,
+        query: &query_map,
+        body: &body_bytes,
     };
-    (state.hooks.on_message)("http-ingress".to_string(), event, data);
-    (
-        StatusCode::OK,
-        axum::Json(serde_json::json!({ "ok": true })),
-    )
-        .into_response()
-}
-
-/// HTTP SSE 推送处理器（与 HttpServer.stream_handler 一致）
-async fn http_stream_handler(
-    State(state): State<UnifiedState>,
-    ConnectInfo(addr): ConnectInfo<SocketAddr>,
-) -> Sse<ClientStream> {
-    let cid = nanoid!(16);
-    let (tx, rx) = mpsc::unbounded_channel::<SseEvent>();
-    state.sse_clients.lock().unwrap().insert(cid.clone(), tx);
-
-    let now = now_rfc3339();
-    let info = ClientInfo {
-        id: cid.clone(),
-        server_id: state.cfg.id.clone(),
-        socket_id: cid.clone(),
-        ip_address: addr.ip().to_string(),
-        connected_at: now.clone(),
-        last_activity_at: now,
-        protocol: state.cfg.protocol,
-        status: ClientStatus::Connected,
-        ..Default::default()
-    };
-    (state.hooks.on_connect)(info);
-
-    let stream = ClientStream {
-        rx,
-        cid: cid.clone(),
-        sse_clients: state.sse_clients.clone(),
-        hooks: state.hooks.clone(),
-    };
-    Sse::new(stream).keep_alive(KeepAlive::new().interval(Duration::from_secs(15)))
-}
-
-// ==================== 中间件 ====================
-
-/// IP 黑白名单中间件（拒绝则返回 403 JSON）
-async fn ip_guard(
-    State(state): State<UnifiedState>,
-    ConnectInfo(addr): ConnectInfo<SocketAddr>,
-    req: Request,
-    next: Next,
-) -> Response {
-    if !state.allow_ip(&addr.ip().to_string()) {
-        return json_error_response(
-            StatusCode::FORBIDDEN,
-            "Forbidden",
-            &format!("IP address {} is not allowed", addr.ip()),
-        );
-    }
-    next.run(req).await
-}
-
-// ==================== SSE 流（携带断开清理） ====================
-
-struct ClientStream {
-    rx: mpsc::UnboundedReceiver<SseEvent>,
-    cid: String,
-    sse_clients: Arc<Mutex<HashMap<String, SseTx>>>,
-    hooks: TransportHooks,
-}
-
-impl Stream for ClientStream {
-    type Item = Result<SseEvent, Infallible>;
-    fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
-        let this = self.get_mut();
-        match this.rx.poll_recv(cx) {
-            Poll::Ready(Some(e)) => Poll::Ready(Some(Ok(e))),
-            Poll::Ready(None) => Poll::Ready(None),
-            Poll::Pending => Poll::Pending,
-        }
-    }
-}
-
-impl Drop for ClientStream {
-    fn drop(&mut self) {
-        self.sse_clients.lock().unwrap().remove(&self.cid);
-        (self.hooks.on_disconnect)(self.cid.clone());
-    }
-}
-
-// ==================== 工具函数 ====================
-
-fn parse_query(q: Option<&str>) -> serde_json::Map<String, serde_json::Value> {
-    let mut m = serde_json::Map::new();
-    if let Some(s) = q {
-        for pair in s.split('&') {
-            if pair.is_empty() {
-                continue;
-            }
-            let (k, v) = match pair.split_once('=') {
-                Some((k, v)) => (k, url_decode(v)),
-                None => (pair, String::new()),
-            };
-            m.insert(url_decode(k), serde_json::Value::String(v));
-        }
-    }
-    m
-}
-
-fn url_decode(s: &str) -> String {
-    let bytes = s.as_bytes();
-    let mut out = Vec::with_capacity(bytes.len());
-    let mut i = 0;
-    while i < bytes.len() {
-        let b = bytes[i];
-        if b == b'+' {
-            out.push(b' ');
-            i += 1;
-        } else if b == b'%' && i + 2 < bytes.len() {
-            if let (Some(h), Some(l)) = (hex(bytes[i + 1]), hex(bytes[i + 2])) {
-                out.push((h << 4) | l);
-                i += 3;
-            } else {
-                out.push(b);
-                i += 1;
-            }
-        } else {
-            out.push(b);
-            i += 1;
-        }
-    }
-    String::from_utf8_lossy(&out).into_owned()
-}
-
-fn hex(c: u8) -> Option<u8> {
-    match c {
-        b'0'..=b'9' => Some(c - b'0'),
-        b'a'..=b'f' => Some(c - b'a' + 10),
-        b'A'..=b'F' => Some(c - b'A' + 10),
-        _ => None,
-    }
+    crate::backend::mock::engine::dispatch(&endpoint, &req_meta).await
 }
 
 // ==================== Transport 实现 ====================
@@ -692,20 +415,7 @@ impl Transport for UnifiedServer {
             );
         }
 
-        let addr = (self.cfg.ip.as_str(), self.cfg.port as u16);
-        let listener = match TcpListener::bind(addr).await {
-            Ok(l) => l,
-            Err(e) if e.kind() == std::io::ErrorKind::AddrInUse => {
-                eprintln!(
-                    "[UnifiedServer] 端口 {} 被占用，尝试释放后重试",
-                    self.cfg.port
-                );
-                release_port(self.cfg.port as u16);
-                tokio::time::sleep(Duration::from_millis(PORT_RELEASE_RETRY_DELAY_MS)).await;
-                TcpListener::bind(addr).await?
-            }
-            Err(e) => return Err(e.into()),
-        };
+        let listener = bind_with_release(self.cfg.ip.as_str(), self.cfg.port as u16).await?;
 
         let app = self
             .build_router()
@@ -834,14 +544,17 @@ mod tests {
 
     #[test]
     fn to_axum_path_converts_placeholders() {
-        assert_eq!(UnifiedServer::to_axum_path("/{event}"), "/:event");
-        assert_eq!(UnifiedServer::to_axum_path("/order/{event}"), "/order/:event");
-        assert_eq!(UnifiedServer::to_axum_path("/stream"), "/stream");
+        assert_eq!(http_routing::to_axum_path("/{event}"), "/:event");
+        assert_eq!(
+            http_routing::to_axum_path("/order/{event}"),
+            "/order/:event"
+        );
+        assert_eq!(http_routing::to_axum_path("/stream"), "/stream");
     }
 
     #[test]
     fn default_http_routes_correct() {
-        let defaults = UnifiedServer::default_http_routes();
+        let defaults = default_http_routes();
         assert_eq!(defaults.len(), 2);
         assert_eq!(defaults[0].method, HttpMethod::Post);
         assert_eq!(defaults[0].path, "/{event}");
@@ -899,9 +612,7 @@ mod tests {
             mock_default_response_body: "{\"error\":\"not found\"}".to_string(),
             ..Default::default()
         };
-        let server = Arc::new_cyclic(|weak| {
-            UnifiedServer::new(cfg, SystemSettings::default(), noop_hooks(), weak.clone())
-        });
+        let server = Arc::new(UnifiedServer::new(cfg, SystemSettings::default(), noop_hooks()));
         let _router = server.build_router();
     }
 
@@ -932,9 +643,7 @@ mod tests {
             mock_enabled: true,
             ..Default::default()
         };
-        let server = Arc::new_cyclic(|weak| {
-            UnifiedServer::new(cfg, SystemSettings::default(), noop_hooks(), weak.clone())
-        });
+        let server = Arc::new(UnifiedServer::new(cfg, SystemSettings::default(), noop_hooks()));
         let _router = server.build_router();
     }
 }

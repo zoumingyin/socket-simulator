@@ -408,39 +408,6 @@ pub struct ClientInfo {
     pub metadata: Option<serde_json::Value>,
 }
 
-// ======================== 消息中心 ========================
-
-/// 消息类型
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
-pub enum MessageType {
-    #[default]
-    #[serde(rename = "text")]
-    Text,
-    #[serde(rename = "json")]
-    Json,
-}
-
-/// 消息模板
-#[derive(Debug, Clone, Serialize, Deserialize, Default)]
-#[serde(rename_all = "camelCase")]
-pub struct MessageTemplate {
-    pub id: String,
-    pub name: String,
-    pub description: Option<String>,
-    #[serde(default)]
-    pub event: String,
-    #[serde(default)]
-    pub message_type: MessageType,
-    #[serde(default)]
-    pub content: String,
-    #[serde(default)]
-    pub is_default: bool,
-    #[serde(default)]
-    pub created_at: String,
-    #[serde(default)]
-    pub updated_at: String,
-}
-
 // ======================== 日志系统 ========================
 
 /// 日志条目
@@ -629,8 +596,6 @@ pub struct PersistedConfig {
     #[serde(default)]
     pub events: Vec<EventConfig>,
     #[serde(default)]
-    pub templates: Vec<MessageTemplate>,
-    #[serde(default)]
     pub mock_services: Vec<MockServiceConfig>,
     #[serde(default)]
     pub system_settings: SystemSettings,
@@ -643,7 +608,7 @@ pub struct PersistedConfig {
 }
 
 fn default_version() -> String {
-    "1.0.0".to_string()
+    "1.1.0".to_string()
 }
 
 impl Default for PersistedConfig {
@@ -651,7 +616,6 @@ impl Default for PersistedConfig {
         Self {
             servers: Vec::new(),
             events: Vec::new(),
-            templates: Vec::new(),
             mock_services: Vec::new(),
             system_settings: SystemSettings::default(),
             window_config: WindowConfig::default(),

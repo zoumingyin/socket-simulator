@@ -20,22 +20,12 @@ use tokio_tungstenite::accept_async;
 
 use crate::backend::constants::*;
 use crate::backend::error::BackendError;
-use crate::backend::net::port_release::release_port;
+use crate::backend::net::bind::bind_with_release;
+use crate::backend::transport::hooks::TransportHooks;
 use crate::backend::transport::Transport;
 use crate::backend::types::*;
 
 use nanoid::nanoid;
-
-/// 受管服务连接回调集合（由 ServiceManager 注入）
-#[derive(Clone)]
-pub struct TransportHooks {
-    /// 客户端连接：`ClientInfo.id` 为原始 socketId（不含 serverId 前缀）
-    pub on_connect: Arc<dyn Fn(ClientInfo) + Send + Sync>,
-    /// 收到消息：`(socket_id, event, data)`
-    pub on_message: Arc<dyn Fn(String, String, Value) + Send + Sync>,
-    /// 客户端断开：`socket_id`
-    pub on_disconnect: Arc<dyn Fn(String) + Send + Sync>,
-}
 
 /// 受管服务 WebSocket 服务端
 pub struct WsServer {
@@ -79,17 +69,13 @@ impl WsServer {
         }
     }
 
-    /// IP 黑白名单过滤（P1-3）
+    /// IP 黑白名单过滤（统一实现见 `crate::backend::net::ip_access`）
     fn allow_ip(&self, ip: &str) -> bool {
-        let wl = &self.sys.ip_access.whitelist;
-        let bl = &self.sys.ip_access.blacklist;
-        if bl.iter().any(|b| b == ip) {
-            return false;
-        }
-        if !wl.is_empty() && !wl.iter().any(|w| w == ip) {
-            return false;
-        }
-        true
+        crate::backend::net::ip_access::allow_ip(
+            &self.sys.ip_access.whitelist,
+            &self.sys.ip_access.blacklist,
+            ip,
+        )
     }
 
     /// accept loop：绑定完成后由 `start` 派生
@@ -239,17 +225,7 @@ impl Transport for WsServer {
         if self.running.load(Ordering::SeqCst) {
             return Ok(());
         }
-        let addr = (self.cfg.ip.as_str(), self.cfg.port as u16);
-        let listener = match TcpListener::bind(addr).await {
-            Ok(l) => l,
-            Err(e) if e.kind() == std::io::ErrorKind::AddrInUse => {
-                eprintln!("[WsServer] 端口 {} 被占用，尝试释放后重试", self.cfg.port);
-                release_port(self.cfg.port as u16);
-                tokio::time::sleep(std::time::Duration::from_millis(PORT_RELEASE_RETRY_DELAY_MS)).await;
-                TcpListener::bind(addr).await?
-            }
-            Err(e) => return Err(e.into()),
-        };
+        let listener = bind_with_release(self.cfg.ip.as_str(), self.cfg.port as u16).await?;
         self.running.store(true, Ordering::SeqCst);
         let this = self
             .self_ref

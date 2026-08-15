@@ -163,7 +163,6 @@ impl ConfigManager {
         self.update(|d| {
             d.servers = config.servers.clone();
             d.events = config.events.clone();
-            d.templates = config.templates.clone();
             d.mock_services = config.mock_services.clone();
             d.system_settings = config.system_settings.clone();
             d.window_config = config.window_config.clone();
@@ -375,5 +374,23 @@ mod tests {
         let out = cm.export_all();
         assert_eq!(out.servers.len(), 1);
         assert_eq!(out.servers[0].id, "a");
+    }
+
+    #[test]
+    fn legacy_config_with_removed_templates_field_migrates() {
+        // P2-3（决策门 4 = B）：templates 已从 schema 移除。
+        // 含 templates 的旧 config 应被 serde 忽略未知字段而成功加载（自动升级），而非报错。
+        let json = r#"{
+            "servers": [{"id":"a","name":"A","port":3000,"protocol":"websocket"}],
+            "events": [],
+            "templates": [{"id":"t1","name":"legacy"}],
+            "mockServices": [],
+            "systemSettings": {},
+            "version": "1.0.0"
+        }"#;
+        let p: PersistedConfig = serde_json::from_str(json).expect("旧 config 应忽略 templates 自动升级");
+        assert_eq!(p.servers.len(), 1);
+        assert_eq!(p.servers[0].id, "a");
+        assert_eq!(p.version, "1.0.0");
     }
 }

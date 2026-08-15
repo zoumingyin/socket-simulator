@@ -7,7 +7,7 @@
 | 模块 | 说明 |
 |------|------|
 | **仪表盘** | 服务运行状态、连接数等概览（实时推送） |
-| **服务管理** | 创建 / 启停 / 重启 WebSocket、Socket.IO 监听服务（受管服务由 Rust 后端实际拉起，可被外部客户端连接） |
+| **服务管理** | 创建 / 启停 / 重启 WebSocket、Socket.IO、HTTP 受管服务（可选与 Mock HTTP 共端口，仅 WebSocket / HTTP 协议支持）；受管服务由 Rust 后端实际拉起，可被外部客户端连接 |
 | **客户端管理** | 查看在线客户端、断开连接、单播消息（实时更新） |
 | **事件管理** | 按服务配置事件规则、轮询推送、默认消息 |
 | **消息中心** | 消息模板、批量发送、广播；**本地消息保存 / 自动填充 / 删除（localStorage 持久化）** |
@@ -21,7 +21,7 @@
 |------|------|
 | 桌面壳 | [Tauri 2](https://tauri.app/)（Rust） |
 | 前端 | React 19、TypeScript、Vite 6、Ant Design 5、Zustand、React Router 7 |
-| 后端 | **Rust（集成于 `src-tauri`，随 Tauri 一并编译）**：`axum` REST + 原生 WebSocket 管理通道 `/admin/ws`、`socketioxide` 受管 Socket.IO 服务、`tokio-tungstenite` 受管 WebSocket 服务 |
+| 后端 | **Rust（集成于 `src-tauri`，随 Tauri 一并编译）**：`axum` REST + 原生 WebSocket 管理通道 `/admin/ws`、`socketioxide` 受管 Socket.IO 服务、`tokio-tungstenite` 受管 WebSocket 服务、内置 Mock HTTP 引擎 |
 | 存储 | JSON 配置文件（`config/config.json`） |
 
 ## 架构概览
@@ -242,6 +242,11 @@ node test-admin-socket.mjs
 
 **启动后看不到主窗口**  
 桌面版默认最小化到托盘。查看任务栏托盘区图标，通过「显示主界面」恢复；或在设置中关闭「启动时最小化到托盘」后重启应用。
+
+## 已知限制
+
+- **Socket.IO 与 Mock HTTP 不可共端口**：统一路由模式（UnifiedServer）依赖 axum 栈，与 `socketioxide` 的 Socket.IO 协议不兼容。为服务启用 Mock 时请使用 **WebSocket** 或 **HTTP** 协议；若对 Socket.IO 服务开启 Mock，启动会直接返回明确错误而非静默失效（协议不会丢失）。
+- Mock HTTP 支持「独立 Mock 服务」与「服务内嵌 Mock（共端口）」两种形态，规则匹配与响应逻辑共用同一引擎。
 
 ## 更新日志
 

@@ -14,7 +14,8 @@ use crate::backend::eventbus::EventBus;
 use crate::backend::transport::http::HttpServer;
 use crate::backend::transport::socketio::SocketIoServer;
 use crate::backend::transport::unified::UnifiedServer;
-use crate::backend::transport::websocket::{TransportHooks, WsServer};
+use crate::backend::transport::hooks::TransportHooks;
+use crate::backend::transport::websocket::WsServer;
 use crate::backend::transport::Transport;
 use crate::backend::types::*;
 
@@ -184,15 +185,20 @@ impl ServiceManager {
         };
 
         let protocol = cfg.protocol;
+        // P0-2: Socket.IO 与 Mock HTTP 共端口不兼容（hyper 1.0 / axum 0.7 与 socketioxide 统一路由冲突）。
+        // 显式拒绝该组合，禁止静默进入 Unified（否则 Socket.IO 实际不会启动，协议静默丢失）。
+        if cfg.mock_enabled && cfg.protocol == ProtocolType::SocketIo {
+            return Err(BackendError::Config(
+                "Socket.IO 协议不支持与 Mock HTTP 共端口（统一路由模式）。请关闭该服务的 Mock，或改用 WebSocket / HTTP 协议。".to_string(),
+            ));
+        }
         let transport: Arc<dyn Transport> = if cfg.mock_enabled {
             // ===== 统一路由模式：Mock HTTP + Socket 共端口 =====
             // 使用 UnifiedServer，在同一个 axum Router 上同时处理：
             // - WebSocket 升级请求 → Socket 传输层
             // - 普通 HTTP 请求 → Mock 引擎（规则匹配 → 模拟响应）
             // 两者通过 fallback handler 中的 Option<WebSocketUpgrade> 自动区分
-            let unified = Arc::new_cyclic(|weak| {
-                UnifiedServer::new(cfg, sys, hooks, weak.clone())
-            });
+            let unified = Arc::new(UnifiedServer::new(cfg, sys, hooks));
             unified.start().await?;
             unified as Arc<dyn Transport>
         } else {
@@ -380,7 +386,8 @@ mod tests {
     use crate::backend::managers::client_manager::ClientManager;
     use crate::backend::managers::config_manager::ConfigManager;
     use crate::backend::managers::log_manager::LogManager;
-    use crate::backend::transport::websocket::{TransportHooks, WsServer};
+    use crate::backend::transport::hooks::TransportHooks;
+use crate::backend::transport::websocket::WsServer;
     use crate::backend::transport::Transport;
     use crate::backend::types::*;
 
