@@ -250,6 +250,13 @@ node test-admin-socket.mjs
 
 ## 更新日志
 
+### Unreleased
+- **P0–P3 重构落地**：纠错与安全网（ClientDisconnect camelCase、Socket.IO×Mock 共端口守卫）、传输与 API 基建抽取（ip_access / bind_with_port_release / TransportHooks、UnifiedServer 组合化、handlers 拆分）、Mock 模型统一（单 MockEngine + 导入热重载 + 清理 templates）、前端整洁（typed api、bootstrap 全局 hydrate、MockWorkbench、类型瘦身、拆壳、导入 lint）。详见 `CHANGELOG.md`。
+- **日志导出修复**：移除对不存在的 `POST /logs/export` 后端的依赖，改为前端按当前过滤条件导出 JSON 下载。
+
+### v2.0.0
+- 后端架构从 Node.js sidecar 完全重写为 Rust，直接编译进 Tauri 二进制；管理通道由 Socket.IO 切换为原生 WebSocket（`/admin/ws`）；详见 `CHANGELOG.md` 的 v2.0.0 破坏性变更说明。
+
 ### v1.1.0
 - **后端 Rust 化**：后端由 Node.js 重写为 Rust，直接集成进 Tauri 进程（`src-tauri`），不再需要独立 Node sidecar 与 `backend/` 目录。
 - **管理通道改为纯 WebSocket**：由 Socket.IO（`/admin/socket.io`）切换为原生 WebSocket（`/admin/ws`），前端 `AdminSocketManager` 移除 `socket.io-client` 依赖。

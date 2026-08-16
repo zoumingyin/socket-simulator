@@ -4,6 +4,23 @@
 
 ---
 
+## [Unreleased]
+
+### Changed
+- 日志导出改为前端按当前过滤条件导出内存日志为 JSON 下载（移除对不存在的 `POST /logs/export` 后端的依赖；过滤语义与 `log_manager::get_entries` 对齐：serverId 精确 / level 下限 / keyword 命中 message+serverId）。
+- 前端日志导出收敛为单一出口 `useLogStore.exportLogs`，移除 `LogViewerPage` 中重复的 blob 逻辑与 500ms 假延迟。
+
+### Internal — P0–P3 重构（2026-08-13 ~ 08-15，已在 `b6ec1bf` / `117ed9d` 提交）
+- **P0 纠错与安全网**：`ClientDisconnect` 改 camelCase；Socket.IO × Mock 共端口守卫（明确报错，禁静默失效）；CORS / 死字段清理；README 对齐。
+- **P1 传输与 API 基建**：抽取 `ip_access` / `bind_with_port_release` / `TransportHooks`；UnifiedServer 组合化（复用 http router + MockEngine，去重）；handlers 按域拆分 + `MockManager` 门面；请求 DTO camelCase 审计。
+- **P2 Mock 模型统一**：决策 B（双配置、单引擎），`MockEngine` 统一入口（主端口 / 自定义端口 / 共端口共用），`import_config` 全量重启受影响服务 + `MockManager::restore`，清理 `templates` 死配置。
+- **P3 前端整洁**：typed `api/` 模块；`bootstrapCore` 全局 hydrate；`MockWorkbench` 抽取 + 删除试跑 Tab；Mock 实时性注释修正；类型瘦身（删 `ServerStats` / `PressureTest*` / `McpTool*` / `ITransport` 等孤儿类型，补齐 `mockServices` / `ClientInfo.group`）；拆壳（MockComponents / LogViewerPage / App.tsx）；导入规范化 + unused-lint。
+
+### Fixed
+- 日志导出死调用（见 Changed）。
+
+---
+
 ## [2.0.0] — 2026-08-04
 
 ### ⚠️ Breaking Changes — 后端架构重写
