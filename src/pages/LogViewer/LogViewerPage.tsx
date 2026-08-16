@@ -25,6 +25,7 @@ export function LogViewerPage(): React.ReactElement {
     fetchLogs,
     setFilter,
     toggleAutoScroll,
+    exportLogs,
     clearLogs,
   } = useLogStore();
   const [exporting, setExporting] = useState(false);
@@ -39,15 +40,7 @@ export function LogViewerPage(): React.ReactElement {
   const handleExport = async () => {
     setExporting(true);
     try {
-      await new Promise((r) => setTimeout(r, 500));
-      const data = JSON.stringify(entries, null, 2);
-      const blob = new Blob([data], { type: 'application/json' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `socket-logs-${new Date().toISOString().split('T')[0]}.json`;
-      a.click();
-      URL.revokeObjectURL(url);
+      await exportLogs(filter);
       messageApi.success('导出成功');
     } catch (e) {
       messageApi.error('导出失败: ' + (e as Error).message);

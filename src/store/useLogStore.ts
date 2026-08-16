@@ -5,11 +5,35 @@
  */
 
 import { create } from 'zustand';
-import type { LogEntry, LogFilter } from '../types/index';
-import { api, apiFetch } from '../api';
+import type { LogEntry, LogFilter, LogLevel } from '../types/index';
+import { api } from '../api';
 import { adminSocket } from '../socket/AdminSocketManager';
 
 const MAX_ENTRIES = 2000;
+
+/** 与后端 `log_manager::get_entries` 对齐的内存过滤（serverId / level 下限 / keyword） */
+const LEVEL_ORDER: LogLevel[] = ['DEBUG', 'INFO', 'WARN', 'ERROR'];
+
+function filterEntries(entries: LogEntry[], filter: LogFilter): LogEntry[] {
+  let result = entries;
+  if (filter.serverId) {
+    const sid = filter.serverId;
+    result = result.filter((e) => e.serverId === sid);
+  }
+  if (filter.level) {
+    const minIdx = LEVEL_ORDER.indexOf(filter.level);
+    result = result.filter((e) => LEVEL_ORDER.indexOf(e.level) >= minIdx);
+  }
+  if (filter.keyword) {
+    const kw = filter.keyword.toLowerCase();
+    result = result.filter(
+      (e) =>
+        e.message.toLowerCase().includes(kw) ||
+        (e.serverId?.toLowerCase().includes(kw) ?? false),
+    );
+  }
+  return result;
+}
 
 interface LogState {
   entries: LogEntry[];
@@ -23,7 +47,7 @@ interface LogState {
   appendLogEntries: (entries: LogEntry[]) => void;
   setFilter: (f: Partial<LogFilter>) => void;
   toggleAutoScroll: () => void;
-  exportLogs: (filePath: string, filter?: LogFilter) => Promise<void>;
+  exportLogs: (filter?: LogFilter) => Promise<void>;
   clearLogs: () => Promise<void>;
 }
 
@@ -92,11 +116,17 @@ export const useLogStore = create<LogState>((set, get) => ({
     set((s) => ({ autoScroll: !s.autoScroll }));
   },
 
-  async exportLogs(filePath, filter) {
-    await apiFetch('/logs/export', {
-      method: 'POST',
-      body: JSON.stringify({ filePath, filter: filter ?? get().filter }),
-    });
+  /** 导出日志：按当前 filter 过滤内存中的 entries，前端生成 JSON 文件下载 */
+  async exportLogs(filter) {
+    const f = filter ?? get().filter;
+    const data = JSON.stringify(filterEntries(get().entries, f), null, 2);
+    const blob = new Blob([data], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `socket-logs-${new Date().toISOString().split('T')[0]}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
   },
 
   async clearLogs() {

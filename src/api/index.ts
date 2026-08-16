@@ -24,9 +24,6 @@ import type {
   MockServiceConfig,
 } from '../types/index';
 
-/** 重新导出底层原语，供确实需要裸调用的极少数场景（如 exportLogs）使用 */
-export { apiFetch };
-
 /** 构建查询字符串；跳过空值，返回 "?a=1&b=2" 或 "" */
 function buildQuery(params: Record<string, string | undefined>): string {
   const sp = new URLSearchParams();
