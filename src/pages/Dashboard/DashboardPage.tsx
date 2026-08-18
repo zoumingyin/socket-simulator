@@ -65,15 +65,15 @@ export function DashboardPage(): React.ReactElement {
     (r) => r.status === "running"
   ).length;
   const totalSent = Object.values(runtimes).reduce(
-    (s, r) => s + r.sentMessages,
+    (s, r) => s + (r.sentMessages ?? 0),
     0
   );
   const totalRecv = Object.values(runtimes).reduce(
-    (s, r) => s + r.receivedMessages,
+    (s, r) => s + (r.receivedMessages ?? 0),
     0
   );
   const totalConnections = Object.values(runtimes).reduce(
-    (s, r) => s + r.totalConnections,
+    (s, r) => s + (r.totalConnections ?? 0),
     0
   );
 

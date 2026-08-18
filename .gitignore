@@ -45,6 +45,7 @@ __pycache__/
 # Alternate / debug cargo target dirs (临时排查用，非产物目录)
 src-tauri/target-fresh/
 src-tauri/target-verify/
+src-tauri/target-old-bak/
 
 # Release / build archives (发布包不入库)
 *.zip

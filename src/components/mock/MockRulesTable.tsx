@@ -59,7 +59,7 @@ export function MockRulesTable({
       render: (_: unknown, r: MockRule) => (
         <Space size={0}>
           <Button type="text" size="small" icon={<EditOutlined />} onClick={() => openEdit(r)} />
-          <Popconfirm title="确认删除？" onConfirm={() => handleDelete(r.id)}>
+          <Popconfirm title="确认删除？" onConfirm={() => handleDelete(r.id!)}>
             <Button type="text" size="small" danger icon={<DeleteOutlined />} />
           </Popconfirm>
         </Space>

@@ -34,7 +34,7 @@ export function EventManagerPage(): React.ReactElement {
     try {
       const vals = await form.validateFields();
       if (editing) {
-        await updateEvent(editing.id, vals);
+        await updateEvent(editing.id!, vals);
         messageApi.success('更新成功');
       } else {
         await addEvent(vals);
@@ -67,11 +67,11 @@ export function EventManagerPage(): React.ReactElement {
     { title: '操作', key: 'actions', align: 'center' as const, render: (_: unknown, r: EventConfig) => (
         <Space>
           {r.status === 'enabled'
-            ? <Button size="small" icon={<StopOutlined />} onClick={() => toggleEvent(r.id, 'disabled')}>禁用</Button>
-            : <Button size="small" type="primary" icon={<CheckCircleOutlined />} onClick={() => toggleEvent(r.id, 'enabled')}>启用</Button>
+            ? <Button size="small" icon={<StopOutlined />} onClick={() => toggleEvent(r.id!, 'disabled')}>禁用</Button>
+            : <Button size="small" type="primary" icon={<CheckCircleOutlined />} onClick={() => toggleEvent(r.id!, 'enabled')}>启用</Button>
           }
           {!r.isDefault && <Button size="small" icon={<EditOutlined />} onClick={() => { setEditing(r); form.setFieldsValue(r); setModalOpen(true); }}>编辑</Button>}
-          {!r.isDefault && <Popconfirm title="确认删除？" onConfirm={() => removeEvent(r.id)}><Button size="small" danger icon={<DeleteOutlined />}>删除</Button></Popconfirm>}
+          {!r.isDefault && <Popconfirm title="确认删除？" onConfirm={() => removeEvent(r.id!)}><Button size="small" danger icon={<DeleteOutlined />}>删除</Button></Popconfirm>}
         </Space>
       ),
     },

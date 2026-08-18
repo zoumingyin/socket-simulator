@@ -7,6 +7,7 @@ pub mod http;
 pub mod unified;
 pub mod hooks;
 pub mod http_routing;
+pub mod ws_connection;
 
 pub use transport::Transport;
 pub use hooks::TransportHooks;

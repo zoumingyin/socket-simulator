@@ -130,14 +130,17 @@
 
 ### 远期 F — 可选 / 单独评估（不在本阶段排期）
 
-| ID | 项 | 说明 |
-|----|----|------|
-| F-1 | 收敛 WS 栈 | 受管 WS 与 Unified 统一为 axum WS 或 tungstenite 之一 |
-| F-2 | Socket.IO 共端口 Mock | 需评估 hyper/axum/socketioxide 版本统一，单独立项 |
-| F-3 | 日志保留清理 | 实现 `cleanup_old` 对接 `logRetentionDays` |
-| F-4 | OpenAPI / 类型生成 | 从 Rust 生成 TS 类型，消灭手工双份 `types` |
-| F-5 | 配置写可靠性 | 持久化通道背压策略（阻塞/合并写）替代静默丢弃 |
-| F-6 | MCP 能力 | 若需 AI 集成，基于现有 REST 封装，勿复活旧 Node MCP |
+> 执行顺序（2026-08-17 用户选定）：F-1 先行（可离线验证）→ F-3 → F-5（离线合并写）→ F-4/F-6（需联网引入 crate，待联网环境）。
+> F-2 已明确**推迟独立立项**（SIO 与 axum 栈不兼容，见 P0-2）；F-4 已完成（specta 生成 TS 类型）；F-6 待联网环境执行。
+
+| ID | 项 | 说明 | 状态 |
+|----|----|------|------|
+| F-1 | 收敛 WS 栈 | 受管 WS（`WsServer`，tungstenite）与 Unified（`UnifiedServer`，axum WS）的消息泵合并为**唯一泛型实现** `pump_ws` + `WireAdapter` 适配层（屏蔽两套 `Message` 类型）。监听层（裸 TCP vs axum Router）不合并。 | ✅ 已完成并验证（2026-08-17：`CARGO_INCREMENTAL=0 cargo test --offline` → **58 passed / 0 failed**，含 `ws_service_accepts_external_client_and_relays` 与 `sio_service_accepts_external_client_and_relays`；告警 28→23，无新增） |
+| F-2 | Socket.IO 共端口 Mock | 需评估 hyper/axum/socketioxide 版本统一，单独立项 | ⏸ 推迟（P0-2 已守卫） |
+| F-3 | 日志保留清理 | `log_manager::cleanup_old(retention_days)` 对接 `SystemSettings.log_retention_days`；启动恢复 + 设置保存时调用 | ✅ 已完成（2026-08-17，`cargo test` 58 passed / 0 failed） |
+| F-4 | OpenAPI / 类型生成 | 从 Rust 生成 TS 类型，消灭手工双份 `types`（specta 倾向，需联网加 crate） | ✅ 已完成并验证（2026-08-17：`specta 1.0.5` 已联网加入；`src/backend/types.rs` 全量加 `specta::Type` derive；新增 bin `export_types`（`cargo run --bin export_types`）生成 `src/types/generated.ts`；`src/types/index.ts` 改为 `export * from './generated'` + 仅保留前端独有类型。验收：`tsc --noEmit` **0 错误**；`cargo test` **59 passed / 0 failed**；`export_types` bin 编译通过。specta 1.0.5 限制：`Option<T>` 恒导出 `T \| null`（无全局 `?` 开关），前端消费处已按 `\| null` 契约适配） |
+| F-5 | 配置写可靠性 | `request_persist` 用 `dirty` 合并写标记 + `in_flight` 单信号替代 `try_send` 静默丢弃；高频写合并为最终落盘、不堆积、不阻塞调用方 | ✅ 已完成并验证（2026-08-17：`CARGO_INCREMENTAL=0 cargo test --offline` → **59 passed / 0 failed**，含 `rapid_writes_coalesce_to_latest`） |
+| F-6 | MCP 能力 | 基于现有 REST 封装 MCP 工具（rmcp 等，需联网加 crate），勿复活旧 Node MCP | ⏳ 待联网环境 |
 
 ---
 
@@ -240,15 +243,36 @@ gantt
 
 ## 8. Definition of Done 检查单
 
-- [ ] 不存在「开启 Mock 后 Socket.IO 静默变 axum」路径
-- [ ] Mock 匹配/响应逻辑仅一处权威实现
-- [ ] 传输层 IP 策略与 bind 重试无复制漂移
-- [ ] 所有前端 JSON 请求字段 camelCase 可反序列化（有测）
-- [ ] 配置导入后运行时与 UI 一致
-- [ ] 前端仅一套 send API；启动后核心列表已 hydrate
-- [ ] `types` 无未实现能力残留；与 Rust 持久化字段对齐
-- [ ] README / 建议稿所述行为与代码一致
-- [ ] 热点文件 `unified.rs`、`ServerManagerPage.tsx` 复杂度下降（行数或职责拆分可量化）
+- [x] 不存在「开启 Mock 后 Socket.IO 静默变 axum」路径（`service_manager.rs:190` 显式拒绝 SIO+Mock 组合，返回可读错误）
+- [x] Mock 匹配/响应逻辑仅一处权威实现（`mock::MockEngine` 单入口；matcher/responder/manager 单测覆盖）
+- [x] 传输层 IP 策略与 bind 重试无复制漂移（`net/ip_access.rs` 共用、`net/bind.rs::bind_with_release` 收敛 6 处复制）
+- [x] 所有前端 JSON 请求字段 camelCase 可反序列化（有测：`ClientDisconnect`/`SendBody` camelCase 反序列化回归 + 36→57 单测）
+- [x] 配置导入后运行时与 UI 一致（`/api/import` 全量重启受影响服务 + `MockManager::restore`，T10 覆盖）
+- [x] 前端仅一套 send API；启动后核心列表已 hydrate（P3-1 typed `api/` + P3-2 bootstrap 预热）
+- [x] `types` 无未实现能力残留；与 Rust 持久化字段对齐（P3-5 删 `ServerStats`/`PressureTest*`/`McpTool*`/`ITransport`/`*State` 等；补齐 `mockServices`/`group`）
+- [x] README / 建议稿所述行为与代码一致（`5321ce5` 补录 CHANGELOG/README，与代码对齐）
+- [x] 热点文件 `unified.rs`、`ServerManagerPage.tsx` 复杂度下降（`ServerManagerPage` 拆为 `ServerList`/`ServerWorkbench`/`sections/*`/`MockWorkbench`；`unified.rs` 经 P1-4 组合化行数下降）
+
+---
+
+## 10. 验收终验记录（2026-08-17）
+
+> 重构计划 P0–P3 全部完成并合入 `main`。本次对 Definition of Done §8 做终验。
+
+| 终验项 | 命令 / 证据 | 结果 |
+|--------|-------------|------|
+| 前端类型检查 | `NODE_OPTIONS="" tsc --noEmit`（开启 `noUnusedLocals`/`noUnusedParameters`） | **0 错误** |
+| 后端单元测试 | `CARGO_INCREMENTAL=0 cargo test`（src-tauri） | **57 passed / 0 failed** |
+| P0-2 协议守卫 | `service_manager.rs:190` `mock_enabled && protocol==SocketIo` → `Err(BackendError::Config(...))` | 已落实 |
+| P1-2 bind 收敛 | `net/bind.rs::bind_with_release` 替换 6 处复制 | 已落实 |
+| P3 构建 | `vite build`（3081 模块，仅 chunk>500kB 体积警告） | 通过 |
+
+**结论**：P0–P3 重构终验通过，DoD §8 全项 ✅。计划内里程碑 M1–M4 全部达成。
+
+**遗留（不在本阶段范围）**：
+- [推送] `main` 领先 `origin/main` 11 个 commit，沙箱无外网，`git push` 待联网环境执行。
+- [远期 F] F-1/F-3/F-5 已完成（59 passed）；F-4 已完成并验证（specta 生成 `src/types/generated.ts`，`tsc` 0 错误）；F-6（MCP/rmcp）待联网引入 crate；F-2 推迟独立立项。
+- [v3.0.0] NexSocket Studio 13 周重构路线未启动。
 
 ---
 

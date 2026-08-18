@@ -127,6 +127,16 @@ pub async fn run(backend: Backend) {
 
     // 恢复 Mock 服务（主端口的标记；自定义端口的立即启动 listener）
     let sys = state.config.get_system_settings();
+
+    // F-3: 启动后按保留天数清理过期日志文件
+    let removed = state.logs.cleanup_old(sys.log_retention_days);
+    if removed > 0 {
+        println!(
+            "[backend] 已清理 {} 个过期日志文件（保留 {} 天）",
+            removed, sys.log_retention_days
+        );
+    }
+
     state.mock.restore(&state.config, &sys).await;
 
     // 构建主路由：显式 API + WS + 统一 fallback（Mock → 前端静态文件 → SPA index.html）

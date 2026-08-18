@@ -22,13 +22,13 @@ function filterEntries(entries: LogEntry[], filter: LogFilter): LogEntry[] {
   }
   if (filter.level) {
     const minIdx = LEVEL_ORDER.indexOf(filter.level);
-    result = result.filter((e) => LEVEL_ORDER.indexOf(e.level) >= minIdx);
+    result = result.filter((e) => LEVEL_ORDER.indexOf(e.level ?? 'DEBUG') >= minIdx);
   }
   if (filter.keyword) {
     const kw = filter.keyword.toLowerCase();
     result = result.filter(
       (e) =>
-        e.message.toLowerCase().includes(kw) ||
+        (e.message ?? '').toLowerCase().includes(kw) ||
         (e.serverId?.toLowerCase().includes(kw) ?? false),
     );
   }

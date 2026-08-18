@@ -76,6 +76,8 @@ export function ServerManagerPage(): React.ReactElement {
         autoStart: vals.autoStart ?? false,
         logLevel: vals.logLevel || 'INFO',
         wssEnabled: false,
+        certPath: null,
+        keyPath: null,
         httpRoutes: [],
         mockEnabled: false,
         mockRules: [],

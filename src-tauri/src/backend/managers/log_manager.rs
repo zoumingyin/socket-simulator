@@ -2,7 +2,7 @@
 //!
 //! 内存环形缓冲（上限 2000 条）+ 按本地日期分文件持久化 + 过滤查询 + 导出/导入。
 //! 每条日志同时经 `EventBus` 发布，驱动管理端 WS 实时推送。日志清空仅清内存
-//! （不清磁盘文件）；旧日志清理由独立的 `cleanup_old` 负责（P1-5）。
+//! （不清磁盘文件）；旧日志清理由 `cleanup_old` 负责（F-3，按 `logRetentionDays` 删除过期文件）。
 
 use std::path::PathBuf;
 use std::sync::Mutex;
@@ -104,6 +104,42 @@ impl LogManager {
         self.entries.lock().unwrap().clear();
     }
 
+    /// 按保留天数清理磁盘日志文件（F-3）。
+    ///
+    /// 仅删除 `log_dir` 下文件名形如 `YYYY-MM-DD.log` 且日期早于
+    /// `今天 - retention_days` 的文件；其他文件（如非日期命名的 `.log`）不受影响。
+    /// 返回被删除的文件数量，便于日志/测试观测。
+    pub fn cleanup_old(&self, retention_days: u64) -> usize {
+        let today = chrono::Local::now().date_naive();
+        let cutoff = match today.checked_sub_signed(chrono::Duration::days(retention_days as i64)) {
+            Some(d) => d,
+            None => return 0,
+        };
+        let mut removed = 0usize;
+        if let Ok(entries) = std::fs::read_dir(&self.log_dir) {
+            for entry in entries.flatten() {
+                let path = entry.path();
+                // 仅处理 `.log` 文件
+                if path.extension().and_then(|e| e.to_str()) != Some("log") {
+                    continue;
+                }
+                // 文件名（去扩展名）须为 `YYYY-MM-DD`
+                let stem = match path.file_stem().and_then(|s| s.to_str()) {
+                    Some(s) => s,
+                    None => continue,
+                };
+                if let Ok(file_date) = chrono::NaiveDate::parse_from_str(stem, "%Y-%m-%d") {
+                    if file_date < cutoff {
+                        if std::fs::remove_file(&path).is_ok() {
+                            removed += 1;
+                        }
+                    }
+                }
+            }
+        }
+        removed
+    }
+
     // ==================== 内部方法 ====================
 
     fn write_to_file(&self, entry: &LogEntry) {
@@ -188,5 +224,33 @@ mod tests {
         });
         assert_eq!(warn.len(), 1);
         assert_eq!(warn[0].message, "err-1");
+    }
+
+    #[test]
+    fn cleanup_old_removes_only_expired_files() {
+        let dir = tmp_log_dir();
+        let m = LogManager::new(dir.clone(), EventBus::new());
+
+        let today = chrono::Local::now().date_naive();
+        let old = today - chrono::Duration::days(30);
+        let recent = today - chrono::Duration::days(2);
+        let make = |d: chrono::NaiveDate| {
+            let p = dir.join(format!("{}.log", d.format("%Y-%m-%d")));
+            std::fs::write(&p, "{}").unwrap();
+            p
+        };
+        let old_p = make(old);
+        let recent_p = make(recent);
+        let other_p = dir.join("notadate.log");
+        std::fs::write(&other_p, "x").unwrap();
+
+        // 保留 7 天：30 天前的文件应删，2 天前的与非日期命名文件应保留
+        let removed = m.cleanup_old(7);
+        assert_eq!(removed, 1, "只有 30 天前的文件应被删除");
+        assert!(!old_p.exists(), "过期文件应已删除");
+        assert!(recent_p.exists(), "2 天前的文件应保留");
+        assert!(other_p.exists(), "非日期命名的 .log 不应被删");
+
+        let _ = std::fs::remove_dir_all(&dir);
     }
 }

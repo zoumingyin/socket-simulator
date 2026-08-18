@@ -47,21 +47,25 @@ export function SettingsPage(): React.ReactElement {
   useLayoutEffect(() => {
     if (systemSettings) {
       form.setFieldsValue({
-        heartbeat: {
-          enabled: systemSettings.heartbeat.enabled,
-          pingInterval: Number(systemSettings.heartbeat.pingInterval),
-          pongTimeout: Number(systemSettings.heartbeat.pongTimeout),
-        },
-        wss: systemSettings.wss,
+        heartbeat: systemSettings.heartbeat
+          ? {
+              enabled: systemSettings.heartbeat.enabled,
+              pingInterval: Number(systemSettings.heartbeat.pingInterval),
+              pongTimeout: Number(systemSettings.heartbeat.pongTimeout),
+            }
+          : { enabled: true, pingInterval: 30000, pongTimeout: 90000 },
+        wss: systemSettings.wss ?? { enabled: false, certPath: '', keyPath: '' },
         // IP 名单：后端存的是 string[]，TextArea 需要字符串
-        ipAccess: {
-          whitelist: Array.isArray(systemSettings.ipAccess.whitelist)
-            ? systemSettings.ipAccess.whitelist.join('\n')
-            : systemSettings.ipAccess.whitelist,
-          blacklist: Array.isArray(systemSettings.ipAccess.blacklist)
-            ? systemSettings.ipAccess.blacklist.join('\n')
-            : systemSettings.ipAccess.blacklist,
-        },
+        ipAccess: systemSettings.ipAccess
+          ? {
+              whitelist: Array.isArray(systemSettings.ipAccess.whitelist)
+                ? systemSettings.ipAccess.whitelist.join('\n')
+                : '',
+              blacklist: Array.isArray(systemSettings.ipAccess.blacklist)
+                ? systemSettings.ipAccess.blacklist.join('\n')
+                : '',
+            }
+          : { whitelist: '', blacklist: '' },
         autoStart: systemSettings.autoStart,
         startMinimized: systemSettings.startMinimized,
         logRetentionDays: Number(systemSettings.logRetentionDays),

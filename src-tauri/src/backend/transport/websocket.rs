@@ -7,14 +7,13 @@ use std::collections::HashMap;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex, Weak};
 
-use futures_util::{SinkExt, StreamExt};
+use futures_util::StreamExt; // 提供 `WebSocketStream::split()`（handle_conn 拆流用）；发送由 pump_ws 内部处理
 use serde_json::Value;
 use tokio::io::{AsyncRead, AsyncWrite};
 use tokio::net::{TcpListener, TcpStream};
 use tokio::sync::mpsc;
 use tokio_rustls::server::TlsStream;
 use tokio_rustls::TlsAcceptor;
-use tokio_tungstenite::tungstenite::Message;
 use tokio_tungstenite::WebSocketStream;
 use tokio_tungstenite::accept_async;
 
@@ -22,6 +21,9 @@ use crate::backend::constants::*;
 use crate::backend::error::BackendError;
 use crate::backend::net::bind::bind_with_release;
 use crate::backend::transport::hooks::TransportHooks;
+use crate::backend::transport::ws_connection::{
+    frame_to_text, pump_ws, TungsteniteAdapter, WireMsg, WsClientRegistry,
+};
 use crate::backend::transport::Transport;
 use crate::backend::types::*;
 
@@ -31,8 +33,8 @@ use nanoid::nanoid;
 pub struct WsServer {
     cfg: ServerConfig,
     sys: SystemSettings,
-    /// raw socketId → 该连接的外发消息发送端
-    clients: Arc<Mutex<HashMap<String, mpsc::Sender<Message>>>>,
+    /// raw socketId → 该连接的外发消息发送端（统一为 WireMsg）
+    clients: WsClientRegistry,
     running: Arc<AtomicBool>,
     hooks: TransportHooks,
     tls: Option<TlsAcceptor>,
@@ -141,81 +143,30 @@ impl WsServer {
         }
     }
 
-    /// 单连接处理：读取入站消息、转发外发消息、生命周期清理
+    /// 单连接处理：拆流 → 注册外发通道 → 交给 `pump_ws`（F-1 收敛后的唯一实现）。
+    /// 连接生命周期/消息路由逻辑全部在 `pump_ws` 中，本方法仅负责 tungstenite 握手后的薄封装。
     async fn handle_conn<S>(self: Arc<Self>, raw_id: String, ws: WebSocketStream<S>, ip: String)
     where
         S: AsyncRead + AsyncWrite + Unpin + Send + 'static,
     {
-        let (mut write, mut read) = ws.split();
-        let (out_tx, mut out_rx) = mpsc::channel::<Message>(64);
+        let (write, read) = ws.split();
+        let (out_tx, out_rx) = mpsc::channel::<WireMsg>(64);
         self.clients.lock().unwrap().insert(raw_id.clone(), out_tx);
 
-        // 通知连接
-        let now = now_rfc3339();
-        let info = ClientInfo {
-            id: raw_id.clone(),
-            server_id: self.cfg.id.clone(),
-            socket_id: raw_id.clone(),
-            ip_address: ip.clone(),
-            connected_at: now.clone(),
-            last_activity_at: now,
-            protocol: self.cfg.protocol,
-            status: ClientStatus::Connected,
-            group: None,
-            group_name: None,
-            metadata: None,
-        };
-        (self.hooks.on_connect)(info);
-
-        loop {
-            tokio::select! {
-                incoming = read.next() => {
-                    match incoming {
-                        Some(Ok(Message::Text(text))) => {
-                            match serde_json::from_str::<WsFrame>(&text) {
-                                Ok(frame) => (self.hooks.on_message)(raw_id.clone(), frame.event, frame.data),
-                                Err(_) => (self.hooks.on_message)(
-                                    raw_id.clone(),
-                                    "message".to_string(),
-                                    serde_json::json!({ "raw": text }),
-                                ),
-                            }
-                        }
-                        Some(Ok(Message::Binary(bin))) => {
-                            let text = String::from_utf8_lossy(&bin).to_string();
-                            (self.hooks.on_message)(
-                                raw_id.clone(),
-                                "message".to_string(),
-                                serde_json::json!({ "raw": text }),
-                            );
-                        }
-                        Some(Ok(Message::Ping(_))) | Some(Ok(Message::Pong(_))) => {
-                            // tungstenite 会自动回复 ping，无需处理
-                        }
-                        Some(Ok(Message::Close(_))) | None => break,
-                        Some(Err(e)) => {
-                            eprintln!("[WsServer] 连接 {} 读错误: {}", raw_id, e);
-                            break;
-                        }
-                        _ => {}
-                    }
-                }
-                outgoing = out_rx.recv() => {
-                    match outgoing {
-                        Some(msg) => {
-                            if write.send(msg).await.is_err() {
-                                break;
-                            }
-                        }
-                        None => break, // 发送端被丢弃（如 disconnect_client 移除）
-                    }
-                }
-            }
-        }
+        pump_ws::<TungsteniteAdapter, _, _>(
+            read,
+            write,
+            raw_id.clone(),
+            ip,
+            self.cfg.clone(),
+            self.hooks.clone(),
+            out_rx,
+        )
+        .await;
 
         // 清理
         self.clients.lock().unwrap().remove(&raw_id);
-        (self.hooks.on_disconnect)(raw_id.clone());
+        (self.hooks.on_disconnect)(raw_id);
     }
 }
 
@@ -243,13 +194,7 @@ impl Transport for WsServer {
     }
 
     async fn send(&self, client_id: &str, event: &str, data: Value) -> Result<(), BackendError> {
-        let msg = Message::Text(
-            serde_json::to_string(&WsFrame {
-                event: event.to_string(),
-                data,
-            })
-            .unwrap_or_default(),
-        );
+        let msg = WireMsg::Text(frame_to_text(event, &data));
         // 在锁作用域内取出发送端，确保 MutexGuard 不跨 .await（std::sync::MutexGuard 非 Send）
         let tx = self.clients.lock().unwrap().get(client_id).cloned();
         if let Some(tx) = tx {
@@ -264,13 +209,7 @@ impl Transport for WsServer {
         data: Value,
         target_ids: Option<Vec<String>>,
     ) -> Result<(), BackendError> {
-        let payload = Message::Text(
-            serde_json::to_string(&WsFrame {
-                event: event.to_string(),
-                data,
-            })
-            .unwrap_or_default(),
-        );
+        let payload = WireMsg::Text(frame_to_text(event, &data));
         let targets: Vec<String> = match target_ids {
             Some(ids) => ids,
             None => {
@@ -292,7 +231,8 @@ impl Transport for WsServer {
         // 取出发送端后再 await，避免持有 std::sync::MutexGuard 跨 await
         let tx = self.clients.lock().unwrap().remove(client_id);
         if let Some(tx) = tx {
-            let _ = tx.send(Message::Close(None)).await;
+            // 先发 Close 帧（优雅关闭），tx 丢弃后 pump 的 out_rx 关闭 → 连接结束
+            let _ = tx.send(WireMsg::Close).await;
         }
         Ok(())
     }

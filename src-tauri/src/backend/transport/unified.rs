@@ -45,18 +45,17 @@ use std::sync::{Arc, Mutex};
 
 use axum::body::to_bytes;
 use axum::extract::connect_info::ConnectInfo;
-use axum::extract::ws::{Message, WebSocket, WebSocketUpgrade};
+use axum::extract::ws::{WebSocket, WebSocketUpgrade};
 use axum::extract::{Request, State};
 use axum::http::StatusCode;
 use axum::middleware::from_fn_with_state;
 use axum::response::sse::Event as SseEvent;
 use axum::response::{IntoResponse, Response};
 use axum::Router;
-use futures_util::{SinkExt, StreamExt};
 use serde_json::Value;
 use tokio::net::TcpListener;
 use tokio::sync::{mpsc, Notify};
-// 注意：使用 axum::extract::ws::Message（而非 tokio_tungstenite::tungstenite::Message）
+use futures_util::StreamExt; // 提供 `WebSocket::split()`（handle_ws_connection 拆流用）
 
 use crate::backend::constants::*;
 use crate::backend::error::BackendError;
@@ -65,6 +64,9 @@ use crate::backend::mock::responder::json_error_response;
 use crate::backend::net::bind::bind_with_release;
 use crate::backend::transport::http_routing::{
     self, build_http_router, default_http_routes, HttpRouteState, ip_guard, parse_query, SseTx,
+};
+use crate::backend::transport::ws_connection::{
+    frame_to_text, pump_ws, AxumAdapter, WireMsg, WsClientRegistry,
 };
 use crate::backend::transport::Transport;
 use crate::backend::transport::hooks::TransportHooks;
@@ -85,8 +87,8 @@ const MAX_BODY_SIZE: usize = 16 * 1024 * 1024; // 16MB
 #[derive(Clone)]
 pub struct UnifiedState {
     // ---------- Socket 传输层状态 ----------
-    /// WS 客户端表：raw socketId → 外发消息发送端
-    pub ws_clients: Arc<Mutex<HashMap<String, mpsc::Sender<Message>>>>,
+    /// WS 客户端表：raw socketId → 外发消息发送端（统一为 WireMsg）
+    pub ws_clients: WsClientRegistry,
     /// SSE 客户端表（HTTP transport stream 模式）：clientId → SSE 发送端
     pub sse_clients: Arc<Mutex<HashMap<String, SseTx>>>,
     /// 传输层回调（连接/消息/断开）
@@ -157,7 +159,7 @@ pub struct UnifiedServer {
     cfg: ServerConfig,
     sys: SystemSettings,
     hooks: TransportHooks,
-    ws_clients: Arc<Mutex<HashMap<String, mpsc::Sender<Message>>>>,
+    ws_clients: WsClientRegistry,
     sse_clients: Arc<Mutex<HashMap<String, SseTx>>>,
     running: Arc<AtomicBool>,
     shutdown: Mutex<Option<Arc<Notify>>>,
@@ -275,72 +277,20 @@ async fn unified_fallback(
 /// - 客户端主动关闭 → 清理
 /// - 服务端 stop → 清空 clients → 各连接因 out_rx 关闭而结束
 async fn handle_ws_connection(state: UnifiedState, socket: WebSocket, raw_id: String, ip: String) {
-    let (mut write, mut read) = socket.split();
-    let (out_tx, mut out_rx) = mpsc::channel::<Message>(64);
+    let (write, read) = socket.split();
+    let (out_tx, out_rx) = mpsc::channel::<WireMsg>(64);
     state.ws_clients.lock().unwrap().insert(raw_id.clone(), out_tx);
 
-    // 通知连接
-    let now = now_rfc3339();
-    let info = ClientInfo {
-        id: raw_id.clone(),
-        server_id: state.cfg.id.clone(),
-        socket_id: raw_id.clone(),
-        ip_address: ip.clone(),
-        connected_at: now.clone(),
-        last_activity_at: now,
-        protocol: state.cfg.protocol,
-        status: ClientStatus::Connected,
-        group: None,
-        group_name: None,
-        metadata: None,
-    };
-    (state.hooks.on_connect)(info);
-
-    loop {
-        tokio::select! {
-            incoming = read.next() => {
-                match incoming {
-                    Some(Ok(Message::Text(text))) => {
-                        match serde_json::from_str::<WsFrame>(&text) {
-                            Ok(frame) => (state.hooks.on_message)(raw_id.clone(), frame.event, frame.data),
-                            Err(_) => (state.hooks.on_message)(
-                                raw_id.clone(),
-                                "message".to_string(),
-                                serde_json::json!({ "raw": text }),
-                            ),
-                        }
-                    }
-                    Some(Ok(Message::Binary(bin))) => {
-                        let text = String::from_utf8_lossy(&bin).to_string();
-                        (state.hooks.on_message)(
-                            raw_id.clone(),
-                            "message".to_string(),
-                            serde_json::json!({ "raw": text }),
-                        );
-                    }
-                    Some(Ok(Message::Ping(_))) | Some(Ok(Message::Pong(_))) => {
-                        // tungstenite 自动回复 ping
-                    }
-                    Some(Ok(Message::Close(_))) | None => break,
-                    Some(Err(e)) => {
-                        eprintln!("[UnifiedServer] WS 连接 {} 读错误: {}", raw_id, e);
-                        break;
-                    }
-                    _ => {}
-                }
-            }
-            outgoing = out_rx.recv() => {
-                match outgoing {
-                    Some(msg) => {
-                        if write.send(msg).await.is_err() {
-                            break;
-                        }
-                    }
-                    None => break,
-                }
-            }
-        }
-    }
+    pump_ws::<AxumAdapter, _, _>(
+        read,
+        write,
+        raw_id.clone(),
+        ip,
+        state.cfg.clone(),
+        state.hooks.clone(),
+        out_rx,
+    )
+    .await;
 
     // 清理
     state.ws_clients.lock().unwrap().remove(&raw_id);
@@ -450,13 +400,7 @@ impl Transport for UnifiedServer {
 
     async fn send(&self, client_id: &str, event: &str, data: Value) -> Result<(), BackendError> {
         // 优先尝试 WS 客户端
-        let ws_msg = Message::Text(
-            serde_json::to_string(&WsFrame {
-                event: event.to_string(),
-                data: data.clone(),
-            })
-            .unwrap_or_default(),
-        );
+        let ws_msg = WireMsg::Text(frame_to_text(event, &data));
         let ws_tx = self.ws_clients.lock().unwrap().get(client_id).cloned();
         if let Some(tx) = ws_tx {
             let _ = tx.send(ws_msg).await;
@@ -481,13 +425,7 @@ impl Transport for UnifiedServer {
         target_ids: Option<Vec<String>>,
     ) -> Result<(), BackendError> {
         // WS 广播
-        let ws_payload = Message::Text(
-            serde_json::to_string(&WsFrame {
-                event: event.to_string(),
-                data: data.clone(),
-            })
-            .unwrap_or_default(),
-        );
+        let ws_payload = WireMsg::Text(frame_to_text(event, &data.clone()));
         let sse_ev = SseEvent::default()
             .event(event.to_string())
             .data(serde_json::to_string(&data).unwrap_or_default());
@@ -521,7 +459,7 @@ impl Transport for UnifiedServer {
         // 尝试 WS 断开
         let ws_tx = self.ws_clients.lock().unwrap().remove(client_id);
         if let Some(tx) = ws_tx {
-            let _ = tx.send(Message::Close(None)).await;
+            let _ = tx.send(WireMsg::Close).await;
             return Ok(());
         }
         // 尝试 SSE 断开

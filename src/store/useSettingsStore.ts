@@ -33,6 +33,8 @@ const defaultSystemSettings: SystemSettings = {
 const defaultWindowConfig: WindowConfig = {
   width: 1280,
   height: 800,
+  x: null,
+  y: null,
   maximized: false,
 };
 

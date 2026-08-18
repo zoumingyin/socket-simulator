@@ -36,7 +36,7 @@ export function OverviewSection({
   const running = runtime?.status === 'running';
   const http = isHttpService(server.protocol);
   const ruleCount = server.mockRules?.length ?? 0;
-  const enabledRules = (server.mockRules ?? []).filter((r: { enabled: boolean }) => r.enabled).length;
+  const enabledRules = (server.mockRules ?? []).filter((r) => r.enabled === true).length;
 
   return (
     <Space direction="vertical" size={16} style={{ width: '100%' }}>

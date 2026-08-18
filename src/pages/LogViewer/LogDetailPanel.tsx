@@ -40,7 +40,7 @@ export function LogDetailPanel({
       style={{ marginTop: 12, backgroundColor: '#fafafa' }}
       title={
         <Space>
-          <Tag color={levelColors[record.level]}>{record.level}</Tag>
+          <Tag color={levelColors[record.level ?? 'INFO']}>{record.level ?? 'INFO'}</Tag>
           <Text strong>{record.event}</Text>
         </Space>
       }
@@ -66,7 +66,7 @@ export function LogDetailPanel({
             <div>
               <Text type="secondary">时间：</Text>
               <Text style={{ fontSize: 13 }}>
-                {new Date(record.timestamp).toLocaleString()}
+                {new Date(record.timestamp ?? '').toLocaleString()}
               </Text>
             </div>
             <div>

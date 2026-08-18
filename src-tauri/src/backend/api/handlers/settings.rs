@@ -22,7 +22,9 @@ pub async fn get_settings(State(b): State<AppState>) -> Resp {
 
 pub async fn save_settings(State(b): State<AppState>, Json(body): Json<SettingsBody>) -> Resp {
     if let Some(s) = body.system_settings {
-        b.config.save_system_settings(s);
+        b.config.save_system_settings(s.clone());
+        // F-3: 保存设置后用最新保留天数触发一次清理
+        b.logs.cleanup_old(s.log_retention_days);
     }
     if let Some(w) = body.window_config {
         b.config.save_window_config(w);

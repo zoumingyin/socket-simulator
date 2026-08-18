@@ -4,6 +4,7 @@
 //! 避免并发写互相覆盖。读取优先返回内存中的权威副本（与现网 Node 版 `config.json` 契约一致）。
 
 use std::path::{Path, PathBuf};
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 
 use tokio::sync::mpsc;
@@ -25,23 +26,39 @@ pub struct ConfigManager {
     data: Arc<Mutex<PersistedConfig>>,
     /// 串行化写操作的发送端
     writer_tx: mpsc::Sender<WriteOp>,
+    /// 合并写标记：存在未落盘的最新内存修改（背压兜底，替代静默丢弃）
+    dirty: Arc<AtomicBool>,
+    /// 飞行中的写信号：保证 channel 内最多 1 个 `Persist`，避免堆积
+    in_flight: Arc<AtomicBool>,
 }
 
 impl ConfigManager {
     pub fn new(config_dir: PathBuf) -> Self {
         let config_file = config_dir.join("config.json");
         let data = Arc::new(Mutex::new(PersistedConfig::default()));
-        let (writer_tx, mut writer_rx) = mpsc::channel::<WriteOp>(32);
+        let dirty = Arc::new(AtomicBool::new(false));
+        let in_flight = Arc::new(AtomicBool::new(false));
+        let (writer_tx, mut writer_rx) = mpsc::channel::<WriteOp>(4);
 
-        // 单写者后台任务：串行消费写请求，把最新内存副本落盘
+        // 单写者后台任务：串行落盘；合并写（dirty 标记）保证高频写不丢、无堆积
         let data_clone = data.clone();
         let file_clone = config_file.clone();
+        let dirty_clone = dirty.clone();
+        let in_flight_clone = in_flight.clone();
         tauri::async_runtime::spawn(async move {
             while writer_rx.recv().await.is_some() {
-                let snapshot = { data_clone.lock().unwrap().clone() };
-                if let Err(e) = persist(&file_clone, &snapshot) {
-                    eprintln!("[ConfigManager] 持久化失败: {}", e);
+                // 合并写：只要等待期间又有新修改（dirty 被置位），就持续落盘最新内存状态，
+                // 直到某次写盘后无新写入，把多次突发写合并为一次最终落盘。
+                loop {
+                    let snapshot = { data_clone.lock().unwrap().clone() };
+                    if let Err(e) = persist(&file_clone, &snapshot) {
+                        eprintln!("[ConfigManager] 持久化失败: {}", e);
+                    }
+                    if !dirty_clone.swap(false, Ordering::SeqCst) {
+                        break;
+                    }
                 }
+                in_flight_clone.store(false, Ordering::SeqCst);
             }
         });
 
@@ -50,6 +67,8 @@ impl ConfigManager {
             config_file,
             data,
             writer_tx,
+            dirty,
+            in_flight,
         }
     }
 
@@ -183,8 +202,19 @@ impl ConfigManager {
     }
 
     fn request_persist(&self) {
-        // 非阻塞发送；缓冲区满时丢弃（下一次写会覆盖最新状态）
-        let _ = self.writer_tx.try_send(WriteOp::Persist);
+        // 标记需要写：合并写把多次高频写合并为一次最终落盘，绝不静默丢弃
+        self.dirty.store(true, Ordering::SeqCst);
+        // 仅当无飞行信号时投递一个 Persist，保证 channel 内最多 1 个信号、不堆积
+        if self
+            .in_flight
+            .compare_exchange(false, true, Ordering::SeqCst, Ordering::SeqCst)
+            .is_ok()
+        {
+            if self.writer_tx.try_send(WriteOp::Persist).is_err() {
+                // 极端情况（写者已退出 / channel 关闭）：放开飞行标记，下次写会重试
+                self.in_flight.store(false, Ordering::SeqCst);
+            }
+        }
     }
 
     fn read_raw(&self) -> PersistedConfig {
@@ -392,5 +422,34 @@ mod tests {
         assert_eq!(p.servers.len(), 1);
         assert_eq!(p.servers[0].id, "a");
         assert_eq!(p.version, "1.0.0");
+    }
+
+    #[test]
+    fn rapid_writes_coalesce_to_latest() {
+        // F-5：高频连续写应合并为最新状态落盘，不应因通道满而静默丢弃
+        let dir = tmp_config_dir();
+        let cm = ConfigManager::new(dir.clone());
+        cm.init();
+        for i in 0..200 {
+            cm.save_servers(vec![mk_server(&format!("s{}", i), &format!("N{}", i))]);
+        }
+        let file = dir.join("config.json");
+        let mut ok = false;
+        for _ in 0..300 {
+            if file.exists() {
+                if let Ok(s) = std::fs::read_to_string(&file) {
+                    if let Ok(pc) = serde_json::from_str::<PersistedConfig>(&s) {
+                        if let Some(last) = pc.servers.last() {
+                            if last.id == "s199" {
+                                ok = true;
+                                break;
+                            }
+                        }
+                    }
+                }
+            }
+            std::thread::sleep(std::time::Duration::from_millis(10));
+        }
+        assert!(ok, "高频写应合并为最新状态落盘（s199）");
     }
 }

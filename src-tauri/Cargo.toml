@@ -49,6 +49,7 @@ rustls = "0.23"
 rustls-pemfile = "2"
 # 前端静态资源嵌入（将 dist/ 编入二进制，由 axum 统一路由提供）
 rust-embed = "8"
+specta = "1.0.5"
 
 [build-dependencies]
 tauri-build = { version = "2", features = [] }
