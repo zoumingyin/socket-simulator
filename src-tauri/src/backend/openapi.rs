@@ -50,6 +50,7 @@ use crate::backend::types::*;
         client_send,
         send_message,
         get_logs,
+        get_logs_persisted,
         logs_clear,
         get_settings,
         save_settings,

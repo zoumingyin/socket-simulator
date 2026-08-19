@@ -96,6 +96,17 @@ export const logs = {
         keyword: filter?.keyword,
       })}`
     ),
+  /** 历史持久化分页查询（P1-4）：SQLite 全量 + 过滤 + 分页，返回 { total, items } */
+  persisted: (params: { limit?: number; offset?: number } & LogFilter = {}) =>
+    apiFetch<{ total: number; items: LogEntry[] }>(
+      `/logs/persisted${buildQuery({
+        serverId: params.serverId,
+        level: params.level,
+        keyword: params.keyword,
+        limit: params.limit != null ? String(params.limit) : undefined,
+        offset: params.offset != null ? String(params.offset) : undefined,
+      })}`
+    ),
   clear: () => apiFetch('/logs/clear', { method: 'POST' }),
 };
 

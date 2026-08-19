@@ -37,12 +37,18 @@ function filterEntries(entries: LogEntry[], filter: LogFilter): LogEntry[] {
 
 interface LogState {
   entries: LogEntry[];
+  /** 历史持久化日志（P1-4：SQLite 分页拉取，早于实时流） */
+  historyEntries: LogEntry[];
+  historyTotal: number;
+  historyLoading: boolean;
   filter: LogFilter;
   autoScroll: boolean;
   loading: boolean;
   error?: string;
 
   fetchLogs: (filter?: LogFilter) => Promise<void>;
+  /** 拉取历史持久化日志（按当前 filter，单页 500 条，去重合并进 historyEntries） */
+  fetchHistory: () => Promise<void>;
   appendLogEntry: (entry: LogEntry) => void;
   appendLogEntries: (entries: LogEntry[]) => void;
   setFilter: (f: Partial<LogFilter>) => void;
@@ -72,6 +78,9 @@ function subscribeLogUpdates(): void {
 
 export const useLogStore = create<LogState>((set, get) => ({
   entries: [],
+  historyEntries: [],
+  historyTotal: 0,
+  historyLoading: false,
   filter: {},
   autoScroll: true,
   loading: false,
@@ -87,6 +96,27 @@ export const useLogStore = create<LogState>((set, get) => ({
       set({ entries: res.data ?? [], loading: false });
     } catch (e) {
       set({ error: (e as Error).message, loading: false });
+    }
+  },
+
+  async fetchHistory() {
+    set({ historyLoading: true });
+    try {
+      const f = get().filter;
+      const res = await api.logs.persisted({ ...f, limit: 500, offset: 0 });
+      const items = res.data?.items ?? [];
+      set((s) => {
+        // 按 id 去重合并（历史早于实时流，排前面）
+        const known = new Set(s.entries.map((e) => e.id).concat(s.historyEntries.map((e) => e.id)));
+        const fresh = items.filter((e) => !known.has(e.id));
+        return {
+          historyEntries: [...fresh.reverse(), ...s.historyEntries],
+          historyTotal: res.data?.total ?? 0,
+          historyLoading: false,
+        };
+      });
+    } catch (e) {
+      set({ historyLoading: false, error: (e as Error).message });
     }
   },
 

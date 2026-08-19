@@ -1373,6 +1373,67 @@
         "tags": []
       }
     },
+    "/api/logs/persisted": {
+      "get": {
+        "operationId": "get_logs_persisted",
+        "parameters": [
+          {
+            "description": "每页条数（默认 100，最大 1000）",
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "format": "int64",
+              "type": "integer"
+            }
+          },
+          {
+            "description": "偏移量",
+            "in": "query",
+            "name": "offset",
+            "required": false,
+            "schema": {
+              "format": "int64",
+              "type": "integer"
+            }
+          },
+          {
+            "description": "按服务 ID 过滤",
+            "in": "query",
+            "name": "serverId",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "日志级别下限：DEBUG/INFO/WARN/ERROR",
+            "in": "query",
+            "name": "level",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "关键词过滤",
+            "in": "query",
+            "name": "keyword",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "返回 { total, items } 分页结构"
+          }
+        },
+        "summary": "历史持久化日志分页查询（P1-4）：SQLite 全量 + 过滤 + 分页",
+        "tags": []
+      }
+    },
     "/api/mock/add": {
       "post": {
         "operationId": "mock_add",

@@ -5,7 +5,8 @@
  * 选中日志后在表格下方独立区域展示详细内容
  */
 import React, { useEffect, useState } from 'react';
-import { Table, Card, Typography, message } from 'antd';
+import { Button, Card, Table, Typography, message } from 'antd';
+import { HistoryOutlined } from '@ant-design/icons';
 import type { LogEntry } from '../../types/index.js';
 import { useLogStore } from '../../store/useLogStore.js';
 import { logColumns } from './logColumns.js';
@@ -18,11 +19,15 @@ export function LogViewerPage(): React.ReactElement {
   const [messageApi, contextHolder] = message.useMessage();
   const {
     entries,
+    historyEntries,
+    historyTotal,
+    historyLoading,
     filter,
     autoScroll,
     loading,
     error,
     fetchLogs,
+    fetchHistory,
     setFilter,
     toggleAutoScroll,
     exportLogs,
@@ -60,12 +65,32 @@ export function LogViewerPage(): React.ReactElement {
   };
 
   /* ---- 渲染 ---- */
+
+  // 历史持久化日志（早）+ 实时流日志（晚）合并展示
+  const mergedEntries = [...historyEntries, ...entries];
+
   return (
     <div>
       {contextHolder}
-      <Title level={4} style={{ marginBottom: 16, fontSize: 18 }}>
-        日志查看器
-      </Title>
+      <div
+        style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          marginBottom: 16,
+        }}
+      >
+        <Title level={4} style={{ margin: 0, fontSize: 18 }}>
+          日志查看器
+        </Title>
+        <Button
+          icon={<HistoryOutlined />}
+          loading={historyLoading}
+          onClick={() => fetchHistory()}
+        >
+          加载历史{historyTotal > 0 ? `（共 ${historyTotal} 条）` : ''}
+        </Button>
+      </div>
 
       <LogToolbar
         filter={filter}
@@ -85,8 +110,8 @@ export function LogViewerPage(): React.ReactElement {
           bordered
           rowKey="id"
           columns={logColumns}
-          dataSource={entries.slice(-500)}
-          loading={loading}
+          dataSource={mergedEntries.slice(-1000)}
+          loading={loading || historyLoading}
           pagination={{
             pageSize: 50,
             showSizeChanger: true,

@@ -229,6 +229,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/logs/persisted": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** 历史持久化日志分页查询（P1-4）：SQLite 全量 + 过滤 + 分页 */
+        get: operations["get_logs_persisted"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/mock/add": {
         parameters: {
             query?: never;
@@ -1372,6 +1389,35 @@ export interface operations {
         requestBody?: never;
         responses: {
             /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    get_logs_persisted: {
+        parameters: {
+            query?: {
+                /** @description 每页条数（默认 100，最大 1000） */
+                limit?: number;
+                /** @description 偏移量 */
+                offset?: number;
+                /** @description 按服务 ID 过滤 */
+                serverId?: string;
+                /** @description 日志级别下限：DEBUG/INFO/WARN/ERROR */
+                level?: string;
+                /** @description 关键词过滤 */
+                keyword?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 返回 { total, items } 分页结构 */
             200: {
                 headers: {
                     [name: string]: unknown;

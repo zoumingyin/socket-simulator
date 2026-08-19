@@ -44,6 +44,7 @@ pub fn build_router(state: AppState) -> Router {
         .route("/api/client/send", post(handlers::client_send))
         .route("/api/send-message", post(handlers::send_message))
         .route("/api/logs", get(handlers::get_logs))
+        .route("/api/logs/persisted", get(handlers::get_logs_persisted))
         .route("/api/logs/clear", post(handlers::logs_clear))
         .route("/api/settings", get(handlers::get_settings))
         .route("/api/settings", post(handlers::save_settings))
