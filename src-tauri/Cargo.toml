@@ -51,6 +51,13 @@ rustls-pemfile = "2"
 rust-embed = "8"
 specta = "1.0.5"
 
+# v3 P0-1：SQLite 存储（可替换 Repository 后端，取代单一 config.json）
+# - default-features=false 关掉 sqlx 默认启的 chrono/uuid/runtime 等，按需开启
+# - runtime-tokio 复用 Tauri 内置 tokio；json 支持 serde_json 字段存储
+# - libsqlite3-sys 显式 bundled：Windows 沙箱无系统 sqlite 开发库，编译自包含
+sqlx = { version = "0.8", default-features = false, features = ["sqlite", "runtime-tokio", "json"] }
+libsqlite3-sys = { version = "0.30", features = ["bundled"] }
+
 [build-dependencies]
 tauri-build = { version = "2", features = [] }
 

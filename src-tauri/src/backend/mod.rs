@@ -12,6 +12,7 @@ pub mod frontend;
 pub mod managers;
 pub mod mock;
 pub mod net;
+pub mod repository;
 pub mod state;
 pub mod transport;
 pub mod types;
