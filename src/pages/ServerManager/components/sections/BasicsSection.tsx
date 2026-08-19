@@ -1,8 +1,38 @@
 import React, { useEffect } from 'react';
 import { Button, Col, Form, Input, InputNumber, Row, Select, Switch } from 'antd';
-import type { ServerConfig } from '../../../../types/index.js';
+import type { ServerConfig, ProtocolType } from '../../../../types/index.js';
+import { visibleFields, type FieldDef } from '../../fieldRegistry.js';
 
 const { Option } = Select;
+
+/** 按字段定义渲染对应控件 */
+function renderControl(field: FieldDef): React.ReactElement {
+  switch (field.control) {
+    case 'number':
+      return (
+        <InputNumber
+          min={field.min}
+          max={field.max}
+          style={{ width: '100%' }}
+        />
+      );
+    case 'select':
+      return (
+        <Select placeholder={field.placeholder}>
+          {(field.options ?? []).map((o) => (
+            <Option key={o.value} value={o.value}>
+              {o.label}
+            </Option>
+          ))}
+        </Select>
+      );
+    case 'switch':
+      return <Switch checkedChildren="是" unCheckedChildren="否" />;
+    case 'text':
+    default:
+      return <Input placeholder={field.placeholder} />;
+  }
+}
 
 export function BasicsSection({
   server,
@@ -22,8 +52,13 @@ export function BasicsSection({
       port: server.port,
       autoStart: server.autoStart,
       logLevel: server.logLevel,
+      wssEnabled: server.wssEnabled,
     });
   }, [server, form]);
+
+  // 注册表驱动：协议切换联动字段可见性（如 WSS 仅 WebSocket）
+  const protocol = (Form.useWatch('protocol', form) ?? server.protocol) as ProtocolType;
+  const fields = visibleFields(protocol);
 
   return (
     <Form
@@ -32,50 +67,22 @@ export function BasicsSection({
       onFinish={(v) => onSave(v)}
     >
       <Row gutter={16}>
-        <Col xs={24} md={14}>
-          <Form.Item name="name" label="服务名称" rules={[{ required: true }]}>
-            <Input />
-          </Form.Item>
-        </Col>
-        <Col xs={24} md={10}>
-          <Form.Item name="protocol" label="协议类型" rules={[{ required: true }]}>
-            <Select>
-              <Option value="websocket">WebSocket</Option>
-              <Option value="socket.io">Socket.IO</Option>
-              <Option value="http">HTTP</Option>
-            </Select>
-          </Form.Item>
-        </Col>
-        <Col xs={24} md={14}>
-          <Form.Item name="ip" label="监听 IP" rules={[{ required: true }]}>
-            <Input placeholder="0.0.0.0" />
-          </Form.Item>
-        </Col>
-        <Col xs={24} md={10}>
-          <Form.Item name="port" label="监听端口" rules={[{ required: true }]}>
-            <InputNumber min={1} max={65535} style={{ width: '100%' }} />
-          </Form.Item>
-        </Col>
-        <Col xs={24} md={10}>
-          <Form.Item name="autoStart" label="自动启动" valuePropName="checked">
-            <Switch checkedChildren="是" unCheckedChildren="否" />
-          </Form.Item>
-        </Col>
-        <Col xs={24} md={14}>
-          <Form.Item name="logLevel" label="日志等级">
-            <Select>
-              <Option value="DEBUG">DEBUG</Option>
-              <Option value="INFO">INFO</Option>
-              <Option value="WARN">WARN</Option>
-              <Option value="ERROR">ERROR</Option>
-            </Select>
-          </Form.Item>
-        </Col>
-        <Col span={24}>
-          <Form.Item name="description" label="描述">
-            <Input placeholder="可选" />
-          </Form.Item>
-        </Col>
+        {fields.map((field) => (
+          <Col key={field.name} xs={24} md={field.span ?? 12}>
+            <Form.Item
+              name={field.name}
+              label={field.label}
+              rules={
+                field.required
+                  ? [{ required: true, message: `请输入${field.label}` }]
+                  : undefined
+              }
+              valuePropName={field.valuePropName}
+            >
+              {renderControl(field)}
+            </Form.Item>
+          </Col>
+        ))}
       </Row>
       <Form.Item>
         <Button type="primary" htmlType="submit">保存</Button>
