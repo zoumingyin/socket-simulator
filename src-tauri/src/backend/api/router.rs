@@ -3,16 +3,23 @@
 //! 覆盖 Node `backend/api/index.ts` 的全部路由，并挂载管理端 WS 通道 `/admin/ws`。
 //! 状态类型 `AppState = Arc<Backend>`，由 `app::run` 通过 `with_state` 注入。
 
+use axum::middleware::from_fn_with_state;
 use axum::routing::{get, post};
 use axum::Router;
 
 use crate::backend::api::handlers;
+use crate::backend::auth::{auth_middleware, bootstrap};
 use crate::backend::constants::ADMIN_WS_PATH;
 use crate::backend::state::AppState;
 use crate::backend::ws::admin;
 
 /// 构建路由（状态由调用方通过 `with_state` 注入）
 pub fn build_router(state: AppState) -> Router {
+    // 鉴权自举端点：独立 state（Arc<AuthManager>），与全局 AppState 解耦
+    let auth_routes = Router::new()
+        .route("/api/auth/bootstrap", get(bootstrap))
+        .with_state(state.auth.clone());
+
     Router::new()
         .route("/api/servers", get(handlers::get_servers))
         .route("/api/server/list", get(handlers::get_server_list))
@@ -50,5 +57,8 @@ pub fn build_router(state: AppState) -> Router {
         .route("/api/mock/start", post(handlers::mock_start))
         .route("/api/mock/stop", post(handlers::mock_stop))
         .route(ADMIN_WS_PATH, get(admin::admin_ws))
-        .with_state(state)
+        .merge(auth_routes)
+        .with_state(state.clone())
+        // 鉴权中间件：默认关闭（SSM_AUTH_ENABLED=1 启用）；enabled 时校验 Bearer token
+        .layer(from_fn_with_state(state.auth.clone(), auth_middleware))
 }
