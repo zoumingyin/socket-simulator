@@ -1,4 +1,4 @@
-import { Card, Space, Button, Tag, Typography } from 'antd';
+import { Card, Space, Button, Tag, Typography, theme } from 'antd';
 const { Text } = Typography;
 import { CloseOutlined } from '@ant-design/icons';
 import type { LogEntry } from '../../types/index.js';
@@ -33,11 +33,12 @@ export function LogDetailPanel({
   const record = selectedLog;
   const hasMetadata =
     record.metadata && Object.keys(record.metadata).length > 0;
+  const { token } = theme.useToken();
 
   return (
     <Card
       variant="outlined"
-      style={{ marginTop: 12, backgroundColor: '#fafafa' }}
+      style={{ marginTop: 12, backgroundColor: token.colorFillAlter }}
       title={
         <Space>
           <Tag color={levelColors[record.level ?? 'INFO']}>{record.level ?? 'INFO'}</Tag>
@@ -134,8 +135,8 @@ export function LogDetailPanel({
           </Text>
           <pre
             style={{
-              backgroundColor: '#fff',
-              border: '1px solid #d9d9d9',
+              backgroundColor: token.colorBgContainer,
+              border: `1px solid ${token.colorBorder}`,
               borderRadius: 6,
               padding: 12,
               maxHeight: 400,
@@ -164,8 +165,8 @@ export function LogDetailPanel({
             </Text>
             <div
               style={{
-                backgroundColor: '#fff',
-                border: '1px solid #d9d9d9',
+                backgroundColor: token.colorBgContainer,
+                border: `1px solid ${token.colorBorder}`,
                 borderRadius: 6,
                 padding: 12,
                 maxHeight: 300,

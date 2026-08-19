@@ -5,7 +5,7 @@
  * 选中日志后在表格下方独立区域展示详细内容
  */
 import React, { useEffect, useState } from 'react';
-import { Button, Card, Table, Typography, message } from 'antd';
+import { Button, Card, Modal, Table, Typography, message } from 'antd';
 import { HistoryOutlined } from '@ant-design/icons';
 import type { LogEntry } from '../../types/index.js';
 import { useLogStore } from '../../store/useLogStore.js';
@@ -55,9 +55,18 @@ export function LogViewerPage(): React.ReactElement {
   };
 
   const handleClear = () => {
-    clearLogs();
-    setSelectedLog(null);
-    messageApi.success('日志已清空');
+    Modal.confirm({
+      title: '清空日志',
+      content: '将清空内存中的日志记录（磁盘文件与历史持久化日志不受影响），确定继续？',
+      okText: '清空',
+      okButtonProps: { danger: true },
+      cancelText: '取消',
+      onOk: async () => {
+        await clearLogs();
+        setSelectedLog(null);
+        messageApi.success('日志已清空');
+      },
+    });
   };
 
   const handleRowClick = (record: LogEntry) => {

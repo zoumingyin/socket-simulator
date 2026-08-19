@@ -5,7 +5,7 @@
 import React, { useEffect, useState } from 'react';
 import {
   Card, Table, Tag, Space, Button, Input, Modal, Form, message, Popconfirm, Typography, Spin,
-  Select, Tooltip, Badge, Radio,
+  Select, Tooltip, Badge, Radio, theme,
 } from 'antd';
 import { SearchOutlined, SendOutlined, DisconnectOutlined, TeamOutlined } from '@ant-design/icons';
 import type { ClientInfo } from '../../types/index.js';
@@ -17,6 +17,7 @@ const { Option } = Select;
 type ViewMode = 'table' | 'grouped';
 
 export function ClientManagerPage(): React.ReactElement {
+  const { token } = theme.useToken();
   const { list, loading, fetchClients, sendMessage, disconnectClient } = useClientStore();
   const [messageApi, contextHolder] = message.useMessage();
   
@@ -239,7 +240,7 @@ export function ClientManagerPage(): React.ReactElement {
         <Text>|</Text>
         <Text>在线: <Text strong style={{ color: '#52c41a' }}>{list.filter(c => c.status === 'connected').length}</Text></Text>
         <Text>|</Text>
-        <Text>离线: <Text strong style={{ color: '#999' }}>{list.filter(c => c.status !== 'connected').length}</Text></Text>
+        <Text>离线: <Text strong style={{ color: token.colorTextTertiary }}>{list.filter(c => c.status !== 'connected').length}</Text></Text>
       </div>
 
       {/* 内容区域 */}

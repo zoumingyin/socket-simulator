@@ -17,6 +17,7 @@ import {
   Spin,
   Tag,
   Typography,
+  theme,
 } from 'antd';
 import { PlusOutlined, ReloadOutlined } from '@ant-design/icons';
 import type { MessageInstance } from 'antd/es/message/interface';
@@ -42,6 +43,7 @@ export function SceneManager({
   onChanged,
   messageApi,
 }: SceneManagerProps): React.ReactElement {
+  const { token } = theme.useToken();
   const [scenes, setScenes] = useState<SceneConfig[]>([]);
   const [loading, setLoading] = useState(false);
   const [actingId, setActingId] = useState<string | null>(null);
@@ -177,9 +179,10 @@ export function SceneManager({
                 <div
                   key={scene.id}
                   style={{
-                    border: '1px solid #e5e7eb',
-                    borderRadius: 8,
+                    border: `1px solid ${token.colorBorderSecondary}`,
+                    borderRadius: token.borderRadius,
                     padding: '12px 16px',
+                    background: token.colorBgContainer,
                   }}
                 >
                   <div

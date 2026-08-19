@@ -15,6 +15,7 @@ import {
   Empty,
   Progress,
   Tooltip,
+  theme,
 } from "antd";
 import {
   CloudServerOutlined,
@@ -33,6 +34,7 @@ import type { ServerConfig } from "../../types/index.js";
 const { Title, Text } = Typography;
 
 export function DashboardPage(): React.ReactElement {
+  const { token } = theme.useToken();
   const {
     list: servers,
     runtimes,
@@ -215,7 +217,7 @@ export function DashboardPage(): React.ReactElement {
               prefix={<TeamOutlined />}
               valueStyle={{ color: "#52c41a" }}
             />
-            <div style={{ marginTop: 8, fontSize: 12, color: "#666" }}>
+            <div style={{ marginTop: 8, fontSize: 12, color: token.colorTextSecondary }}>
               总连接数: {totalConnections}
             </div>
           </Card>
@@ -228,7 +230,7 @@ export function DashboardPage(): React.ReactElement {
               prefix={<ArrowUpOutlined />}
               valueStyle={{ color: "#fa8c16" }}
             />
-            <div style={{ marginTop: 8, fontSize: 12, color: "#666" }}>
+            <div style={{ marginTop: 8, fontSize: 12, color: token.colorTextSecondary }}>
               总发送: {totalSent}
             </div>
           </Card>
@@ -241,7 +243,7 @@ export function DashboardPage(): React.ReactElement {
               prefix={<ArrowDownOutlined />}
               valueStyle={{ color: "#722ed1" }}
             />
-            <div style={{ marginTop: 8, fontSize: 12, color: "#666" }}>
+            <div style={{ marginTop: 8, fontSize: 12, color: token.colorTextSecondary }}>
               总接收: {totalRecv}
             </div>
           </Card>
