@@ -576,6 +576,38 @@ impl<T: Default> Default for ApiResponse<T> {
     }
 }
 
+// ======================== 场景编排（P1-3） ========================
+
+/// 场景配置（多服务编排：有序服务组，一键启停）
+#[derive(Debug, Clone, Serialize, Deserialize, Default, specta::Type, utoipa::ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct SceneConfig {
+    #[serde(default)]
+    pub id: String,
+    #[serde(default)]
+    pub name: String,
+    #[serde(default)]
+    pub description: Option<String>,
+    /// 服务 ID 有序列表（启动按此顺序、停止逆序）
+    #[serde(default)]
+    pub server_ids: Vec<String>,
+    #[serde(default = "default_true")]
+    pub enabled: bool,
+    #[serde(default)]
+    pub created_at: String,
+    #[serde(default)]
+    pub updated_at: String,
+}
+
+/// 场景内单个服务的启停结果
+#[derive(Debug, Clone, Serialize, specta::Type, utoipa::ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct SceneServerResult {
+    pub server_id: String,
+    pub success: bool,
+    pub error: Option<String>,
+}
+
 // ======================== 传输层抽象（文档化契约） ========================
 
 /// WS 消息帧：`{ "event": string, "data": object }`
@@ -598,6 +630,8 @@ pub struct PersistedConfig {
     #[serde(default)]
     pub mock_services: Vec<MockServiceConfig>,
     #[serde(default)]
+    pub scenes: Vec<SceneConfig>,
+    #[serde(default)]
     pub system_settings: SystemSettings,
     #[serde(default)]
     pub window_config: WindowConfig,
@@ -617,6 +651,7 @@ impl Default for PersistedConfig {
             servers: Vec::new(),
             events: Vec::new(),
             mock_services: Vec::new(),
+            scenes: Vec::new(),
             system_settings: SystemSettings::default(),
             window_config: WindowConfig::default(),
             version: default_version(),

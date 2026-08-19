@@ -187,6 +187,26 @@ impl ConfigManager {
         self.update(|d| d.mock_services = list);
     }
 
+    // ===== 场景编排（P1-3） =====
+
+    pub fn get_scenes(&self) -> Vec<SceneConfig> {
+        self.data.lock().unwrap().scenes.clone()
+    }
+
+    pub fn get_scene_by_id(&self, id: &str) -> Option<SceneConfig> {
+        self.data
+            .lock()
+            .unwrap()
+            .scenes
+            .iter()
+            .find(|s| s.id == id)
+            .cloned()
+    }
+
+    pub fn save_scenes(&self, list: Vec<SceneConfig>) {
+        self.update(|d| d.scenes = list);
+    }
+
     pub fn export_all(&self) -> PersistedConfig {
         self.data.lock().unwrap().clone()
     }
@@ -232,6 +252,7 @@ impl ConfigManager {
             d.servers = config.servers.clone();
             d.events = config.events.clone();
             d.mock_services = config.mock_services.clone();
+            d.scenes = config.scenes.clone();
             d.system_settings = config.system_settings.clone();
             d.window_config = config.window_config.clone();
             d.version = config.version.clone();

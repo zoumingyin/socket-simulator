@@ -40,6 +40,12 @@ export type MockRule = { id?: string; name?: string; method?: HttpMethod; pathPa
  * Mock 服务配置
  */
 export type MockServiceConfig = { id?: string; name?: string; description?: string; basePath?: string; customPort?: number | null; defaultStatusCode?: number; defaultResponseBody?: string; defaultDelayMs?: number; enabled?: boolean; rules?: MockRule[]; createdAt?: string; updatedAt?: string }/**
+ * 场景配置（多服务编排：有序服务组，一键启停）
+ */
+export type SceneConfig = { id?: string; name?: string; description?: string | null; serverIds?: string[]; enabled?: boolean; createdAt?: string; updatedAt?: string }/**
+ * 场景内单个服务的启停结果
+ */
+export type SceneServerResult = { serverId: string; success: boolean; error: string | null }/**
  * 服务配置
  */
 export type ServerConfig = { id: string; name: string; description: string; ip: string; port: number; protocol: ProtocolType; autoStart: boolean; logLevel: LogLevel; wssEnabled: boolean; certPath: string | null; keyPath: string | null; httpRoutes?: HttpRouteConfig[]; mockEnabled?: boolean; mockRules?: MockRule[]; mockDefaultStatusCode?: number; mockDefaultResponseBody?: string; mockDefaultDelayMs?: number; createdAt: string; updatedAt: string }/**
@@ -75,4 +81,4 @@ export type WindowConfig = { width: number; height: number; x: number | null; y:
 export type WsFrame = { event: string; data: any }/**
  * 持久化配置集合（单 config.json）
  */
-export type PersistedConfig = { servers?: ServerConfig[]; events?: EventConfig[]; mockServices?: MockServiceConfig[]; systemSettings?: SystemSettings; windowConfig?: WindowConfig; version?: string; exportedAt?: string }
+export type PersistedConfig = { servers?: ServerConfig[]; events?: EventConfig[]; mockServices?: MockServiceConfig[]; scenes?: SceneConfig[]; systemSettings?: SystemSettings; windowConfig?: WindowConfig; version?: string; exportedAt?: string }

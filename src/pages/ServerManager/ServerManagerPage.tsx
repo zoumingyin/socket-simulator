@@ -8,12 +8,13 @@ import {
   Alert, Button, Form, Input, InputNumber, Modal, Select, Space, Spin, Typography, message, theme,
 } from 'antd';
 import {
-  PauseCircleOutlined, PlayCircleOutlined, PlusOutlined, ReloadOutlined,
+  PauseCircleOutlined, PlayCircleOutlined, PlusOutlined, ReloadOutlined, ApartmentOutlined,
 } from '@ant-design/icons';
 import type { ServerConfig } from '../../types/index.js';
 import { useServerStore } from '../../store/useServerStore.js';
 import { ServerList, type StatusFilter } from './components/ServerList.js';
 import { ServerWorkbench } from './components/ServerWorkbench.js';
+import { SceneManager } from './components/SceneManager.js';
 import type { WorkbenchSection } from './protocolStyles.js';
 
 const { Title, Text } = Typography;
@@ -37,6 +38,7 @@ export function ServerManagerPage(): React.ReactElement {
   const [createForm] = Form.useForm();
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
   const [selectedKeys, setSelectedKeys] = useState<string[]>([]);
+  const [sceneOpen, setSceneOpen] = useState(false);
 
   useEffect(() => {
     fetchServers();
@@ -156,6 +158,9 @@ export function ServerManagerPage(): React.ReactElement {
           </Button>
           <Button icon={<ReloadOutlined />} onClick={() => restartAll()} disabled={list.length === 0}>
             全部重启
+          </Button>
+          <Button icon={<ApartmentOutlined />} onClick={() => setSceneOpen(true)}>
+            场景
           </Button>
         </Space>
       </div>
@@ -277,6 +282,14 @@ export function ServerManagerPage(): React.ReactElement {
           </Form.Item>
         </Form>
       </Modal>
+
+      <SceneManager
+        open={sceneOpen}
+        onClose={() => setSceneOpen(false)}
+        servers={list}
+        onChanged={fetchRuntimes}
+        messageApi={messageApi}
+      />
     </div>
   );
 }

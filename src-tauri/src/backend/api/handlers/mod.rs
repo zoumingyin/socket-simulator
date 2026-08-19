@@ -21,6 +21,7 @@ pub mod config;
 pub mod events;
 pub mod logs;
 pub mod mock;
+pub mod scenes;
 pub mod servers;
 pub mod settings;
 
@@ -30,6 +31,7 @@ pub use config::*;
 pub use events::*;
 pub use logs::*;
 pub use mock::*;
+pub use scenes::*;
 pub use servers::*;
 pub use settings::*;
 

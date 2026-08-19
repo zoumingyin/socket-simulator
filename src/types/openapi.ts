@@ -341,6 +341,108 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/scene/add": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** 新增场景（自动生成 id / 时间戳并持久化） */
+        post: operations["scene_add"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/scene/list": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** 场景列表 */
+        get: operations["scene_list"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/scene/remove": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** 删除场景（仅移除编排，不停服务） */
+        post: operations["scene_remove"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/scene/start": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** 一键启动场景：按 server_ids 顺序启动，返回逐服务结果 */
+        post: operations["scene_start"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/scene/stop": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** 一键停止场景：逆序停止，返回停止数 */
+        post: operations["scene_stop"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/scene/update": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** 更新场景 */
+        post: operations["scene_update"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/send-message": {
         parameters: {
             query?: never;
@@ -789,6 +891,7 @@ export interface components {
             events?: components["schemas"]["EventConfig"][];
             exportedAt?: string;
             mockServices?: components["schemas"]["MockServiceConfig"][];
+            scenes?: components["schemas"]["SceneConfig"][];
             servers?: components["schemas"]["ServerConfig"][];
             systemSettings?: components["schemas"]["SystemSettings"];
             version?: string;
@@ -799,6 +902,26 @@ export interface components {
          * @enum {string}
          */
         ProtocolType: "websocket" | "socket.io" | "http";
+        /** @description 场景配置（多服务编排：有序服务组，一键启停） */
+        SceneConfig: {
+            createdAt?: string;
+            description?: string | null;
+            enabled?: boolean;
+            id?: string;
+            name?: string;
+            /** @description 服务 ID 有序列表（启动按此顺序、停止逆序） */
+            serverIds?: string[];
+            updatedAt?: string;
+        };
+        SceneId: {
+            id: string;
+        };
+        /** @description 场景内单个服务的启停结果 */
+        SceneServerResult: {
+            error?: string | null;
+            serverId: string;
+            success: boolean;
+        };
         SendBody: {
             clientId?: string | null;
             content?: string | null;
@@ -1399,6 +1522,134 @@ export interface operations {
         };
         responses: {
             /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    scene_add: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SceneConfig"];
+            };
+        };
+        responses: {
+            /** @description 添加成功，返回新场景 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    scene_list: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 场景配置列表 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    scene_remove: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SceneId"];
+            };
+        };
+        responses: {
+            /** @description 删除成功 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    scene_start: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SceneId"];
+            };
+        };
+        responses: {
+            /** @description 启动结果（逐服务） */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    scene_stop: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SceneId"];
+            };
+        };
+        responses: {
+            /** @description 停止成功 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    scene_update: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SceneConfig"];
+            };
+        };
+        responses: {
+            /** @description 更新成功 */
             200: {
                 headers: {
                     [name: string]: unknown;

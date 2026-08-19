@@ -22,6 +22,8 @@ import type {
   WindowConfig,
   SendMessageRequest,
   MockServiceConfig,
+  SceneConfig,
+  SceneServerResult,
 } from '../types/index';
 
 /** 构建查询字符串；跳过空值，返回 "?a=1&b=2" 或 "" */
@@ -128,6 +130,21 @@ export const mock = {
     apiFetch('/mock/stop', { method: 'POST', body: JSON.stringify({ id }) }),
 };
 
+/** 场景编排（P1-3） */
+export const scenes = {
+  list: () => apiFetch<SceneConfig[]>('/scene/list'),
+  add: (cfg: Omit<SceneConfig, 'id' | 'createdAt' | 'updatedAt'>) =>
+    apiFetch<SceneConfig>('/scene/add', { method: 'POST', body: JSON.stringify(cfg) }),
+  update: (cfg: SceneConfig) =>
+    apiFetch('/scene/update', { method: 'POST', body: JSON.stringify(cfg) }),
+  remove: (id: string) =>
+    apiFetch('/scene/remove', { method: 'POST', body: JSON.stringify({ id }) }),
+  start: (id: string) =>
+    apiFetch<SceneServerResult[]>('/scene/start', { method: 'POST', body: JSON.stringify({ id }) }),
+  stop: (id: string) =>
+    apiFetch<{ stopped: number }>('/scene/stop', { method: 'POST', body: JSON.stringify({ id }) }),
+};
+
 /** 统一入口 */
-export const api = { servers, events, clients, logs, settings, config, mock };
+export const api = { servers, events, clients, logs, settings, config, mock, scenes };
 export default api;

@@ -45,6 +45,8 @@ fn main() {
     exp!(MockMatchCondition);
     exp!(MockRule);
     exp!(MockServiceConfig);
+    exp!(SceneConfig);
+    exp!(SceneServerResult);
     exp!(ServerConfig);
     exp!(ServerRuntime);
     exp!(EventConfig);

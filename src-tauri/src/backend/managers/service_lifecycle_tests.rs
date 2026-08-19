@@ -409,3 +409,67 @@ async fn mock_custom_port_listens_and_serves() {
         "停止后 running_ids 不应包含 mc1"
     );
 }
+
+// ==================== P1-3 场景编排 ====================
+
+/// 场景一键启停：注册 2 个 WS 服务组成场景，按序启动、逆序停止
+#[tokio::test]
+async fn scene_start_stops_servers_in_order() {
+    let (sm, _tmp) = setup();
+    let mut servers = Vec::new();
+    for (i, id) in ["scene-s1", "scene-s2"].iter().enumerate() {
+        let port = free_port().await;
+        servers.push(ServerConfig {
+            id: id.to_string(),
+            name: format!("scene-{}", i),
+            ip: "127.0.0.1".to_string(),
+            port,
+            protocol: ProtocolType::Websocket,
+            ..Default::default()
+        });
+    }
+    for s in &servers {
+        sm.register_server(s.clone());
+    }
+    sm.config.save_servers(servers);
+
+    let scene = SceneConfig {
+        id: "scene-1".to_string(),
+        name: "dev-stack".to_string(),
+        description: Some("开发环境服务组".to_string()),
+        server_ids: vec!["scene-s1".to_string(), "scene-s2".to_string()],
+        enabled: true,
+        ..Default::default()
+    };
+
+    // 一键启动：两服务均 Running
+    let results = sm.start_scene(&scene).await;
+    assert_eq!(results.len(), 2);
+    assert!(results.iter().all(|r| r.success), "场景内服务应全部启动成功");
+    let runtimes = sm.get_runtimes();
+    assert_eq!(runtimes.get("scene-s1").unwrap().status, ServerStatus::Running);
+    assert_eq!(runtimes.get("scene-s2").unwrap().status, ServerStatus::Running);
+
+    // 一键停止：两服务均 Stopped
+    let stopped = sm.stop_scene(&scene).await;
+    assert_eq!(stopped, 2, "场景应停止全部服务");
+    let runtimes = sm.get_runtimes();
+    assert_eq!(runtimes.get("scene-s1").unwrap().status, ServerStatus::Stopped);
+    assert_eq!(runtimes.get("scene-s2").unwrap().status, ServerStatus::Stopped);
+}
+
+/// 旧配置（无 scenes 字段）反序列化向后兼容（P1-3 持久化加字段不破坏旧 config.json）
+#[test]
+fn persisted_config_without_scenes_deserializes() {
+    let json = r#"{
+        "servers": [],
+        "events": [],
+        "mockServices": [],
+        "systemSettings": {},
+        "windowConfig": {},
+        "version": "1.1.0",
+        "exportedAt": ""
+    }"#;
+    let cfg: PersistedConfig = serde_json::from_str(json).expect("旧 config.json 应可反序列化");
+    assert!(cfg.scenes.is_empty(), "缺省 scenes 应为空列表");
+}

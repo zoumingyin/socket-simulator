@@ -617,6 +617,12 @@
             },
             "type": "array"
           },
+          "scenes": {
+            "items": {
+              "$ref": "#/components/schemas/SceneConfig"
+            },
+            "type": "array"
+          },
           "servers": {
             "items": {
               "$ref": "#/components/schemas/ServerConfig"
@@ -643,6 +649,73 @@
           "http"
         ],
         "type": "string"
+      },
+      "SceneConfig": {
+        "description": "场景配置（多服务编排：有序服务组，一键启停）",
+        "properties": {
+          "createdAt": {
+            "type": "string"
+          },
+          "description": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "enabled": {
+            "type": "boolean"
+          },
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "serverIds": {
+            "description": "服务 ID 有序列表（启动按此顺序、停止逆序）",
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "updatedAt": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "SceneId": {
+        "properties": {
+          "id": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "type": "object"
+      },
+      "SceneServerResult": {
+        "description": "场景内单个服务的启停结果",
+        "properties": {
+          "error": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "serverId": {
+            "type": "string"
+          },
+          "success": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "serverId",
+          "success"
+        ],
+        "type": "object"
       },
       "SendBody": {
         "properties": {
@@ -1434,6 +1507,128 @@
             "description": "OK"
           }
         },
+        "tags": []
+      }
+    },
+    "/api/scene/add": {
+      "post": {
+        "operationId": "scene_add",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SceneConfig"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "添加成功，返回新场景"
+          }
+        },
+        "summary": "新增场景（自动生成 id / 时间戳并持久化）",
+        "tags": []
+      }
+    },
+    "/api/scene/list": {
+      "get": {
+        "operationId": "scene_list",
+        "responses": {
+          "200": {
+            "description": "场景配置列表"
+          }
+        },
+        "summary": "场景列表",
+        "tags": []
+      }
+    },
+    "/api/scene/remove": {
+      "post": {
+        "operationId": "scene_remove",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SceneId"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "删除成功"
+          }
+        },
+        "summary": "删除场景（仅移除编排，不停服务）",
+        "tags": []
+      }
+    },
+    "/api/scene/start": {
+      "post": {
+        "operationId": "scene_start",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SceneId"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "启动结果（逐服务）"
+          }
+        },
+        "summary": "一键启动场景：按 server_ids 顺序启动，返回逐服务结果",
+        "tags": []
+      }
+    },
+    "/api/scene/stop": {
+      "post": {
+        "operationId": "scene_stop",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SceneId"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "停止成功"
+          }
+        },
+        "summary": "一键停止场景：逆序停止，返回停止数",
+        "tags": []
+      }
+    },
+    "/api/scene/update": {
+      "post": {
+        "operationId": "scene_update",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SceneConfig"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "更新成功"
+          }
+        },
+        "summary": "更新场景",
         "tags": []
       }
     },

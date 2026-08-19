@@ -61,6 +61,13 @@ pub fn build_router(state: AppState) -> Router {
         .route("/api/mock/remove", post(handlers::mock_remove))
         .route("/api/mock/start", post(handlers::mock_start))
         .route("/api/mock/stop", post(handlers::mock_stop))
+        // 场景编排（P1-3）
+        .route("/api/scene/list", get(handlers::scene_list))
+        .route("/api/scene/add", post(handlers::scene_add))
+        .route("/api/scene/update", post(handlers::scene_update))
+        .route("/api/scene/remove", post(handlers::scene_remove))
+        .route("/api/scene/start", post(handlers::scene_start))
+        .route("/api/scene/stop", post(handlers::scene_stop))
         .route(ADMIN_WS_PATH, get(admin::admin_ws))
         .merge(auth_routes)
         .with_state(state.clone())

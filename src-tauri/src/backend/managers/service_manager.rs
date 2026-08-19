@@ -276,6 +276,43 @@ impl ServiceManager {
         Ok(())
     }
 
+    /// 启动场景（P1-3）：按 `server_ids` 顺序逐个启动；单点失败记日志继续，返回逐服务结果。
+    pub async fn start_scene(&self, scene: &SceneConfig) -> Vec<SceneServerResult> {
+        let mut results = Vec::with_capacity(scene.server_ids.len());
+        for sid in &scene.server_ids {
+            match self.start(sid.clone()).await {
+                Ok(()) => results.push(SceneServerResult {
+                    server_id: sid.clone(),
+                    success: true,
+                    error: None,
+                }),
+                Err(e) => {
+                    eprintln!(
+                        "[ServiceManager] 场景 {} 启动服务 {} 失败: {}",
+                        scene.name, sid, e
+                    );
+                    results.push(SceneServerResult {
+                        server_id: sid.clone(),
+                        success: false,
+                        error: Some(e.to_string()),
+                    });
+                }
+            }
+        }
+        results
+    }
+
+    /// 停止场景（P1-3）：逆序停止，返回成功停止数。
+    pub async fn stop_scene(&self, scene: &SceneConfig) -> usize {
+        let mut stopped = 0;
+        for sid in scene.server_ids.iter().rev() {
+            if self.stop(sid).await.is_ok() {
+                stopped += 1;
+            }
+        }
+        stopped
+    }
+
     /// 全量运行时快照
     pub fn get_runtimes(&self) -> HashMap<String, ServerRuntime> {
         self.runtimes.lock().unwrap().clone()
