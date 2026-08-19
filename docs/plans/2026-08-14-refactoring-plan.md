@@ -131,7 +131,7 @@
 ### 远期 F — 可选 / 单独评估（不在本阶段排期）
 
 > 执行顺序（2026-08-17 用户选定）：F-1 先行（可离线验证）→ F-3 → F-5（离线合并写）→ F-4/F-6（需联网引入 crate，待联网环境）。
-> F-2 已明确**推迟独立立项**（SIO 与 axum 栈不兼容，见 P0-2）；F-4 已完成（specta 生成 TS 类型）；F-6 待联网环境执行。
+> F-2 已明确**推迟独立立项**（SIO 与 axum 栈不兼容，见 P0-2）；F-4 已完成（specta 生成 TS 类型）；F-6 **已决策不做**（2026-08-19，YAGNI，非立项能力，早期 `McpTool*` 已删）。
 
 | ID | 项 | 说明 | 状态 |
 |----|----|------|------|
@@ -140,7 +140,7 @@
 | F-3 | 日志保留清理 | `log_manager::cleanup_old(retention_days)` 对接 `SystemSettings.log_retention_days`；启动恢复 + 设置保存时调用 | ✅ 已完成（2026-08-17，`cargo test` 58 passed / 0 failed） |
 | F-4 | OpenAPI / 类型生成 | 从 Rust 生成 TS 类型，消灭手工双份 `types`（specta 倾向，需联网加 crate） | ✅ 已完成并验证（2026-08-17：`specta 1.0.5` 已联网加入；`src/backend/types.rs` 全量加 `specta::Type` derive；新增 bin `export_types`（`cargo run --bin export_types`）生成 `src/types/generated.ts`；`src/types/index.ts` 改为 `export * from './generated'` + 仅保留前端独有类型。验收：`tsc --noEmit` **0 错误**；`cargo test` **59 passed / 0 failed**；`export_types` bin 编译通过。specta 1.0.5 限制：`Option<T>` 恒导出 `T \| null`（无全局 `?` 开关），前端消费处已按 `\| null` 契约适配） |
 | F-5 | 配置写可靠性 | `request_persist` 用 `dirty` 合并写标记 + `in_flight` 单信号替代 `try_send` 静默丢弃；高频写合并为最终落盘、不堆积、不阻塞调用方 | ✅ 已完成并验证（2026-08-17：`CARGO_INCREMENTAL=0 cargo test --offline` → **59 passed / 0 failed**，含 `rapid_writes_coalesce_to_latest`） |
-| F-6 | MCP 能力 | 基于现有 REST 封装 MCP 工具（rmcp 等，需联网加 crate），勿复活旧 Node MCP | ⏳ 待联网环境 |
+| F-6 | MCP 能力 | 基于现有 REST 封装 MCP 工具（rmcp 等，需联网加 crate），勿复活旧 Node MCP | ❌ 已决策不做（2026-08-19：YAGNI，非立项能力；早期 `McpTool*` 死代码已删，无复用价值） |
 
 ---
 
@@ -271,7 +271,7 @@ gantt
 
 **遗留（不在本阶段范围）**：
 - [推送] `main` 领先 `origin/main` 11 个 commit，沙箱无外网，`git push` 待联网环境执行。
-- [远期 F] F-1/F-3/F-5 已完成（59 passed）；F-4 已完成并验证（specta 生成 `src/types/generated.ts`，`tsc` 0 错误）；F-6（MCP/rmcp）待联网引入 crate；F-2 推迟独立立项。
+- [远期 F] F-1/F-3/F-5 已完成（59 passed）；F-4 已完成并验证（specta 生成 `src/types/generated.ts`，`tsc` 0 错误）；F-6 **已决策不做**（MCP/rmcp，2026-08-19 用户拍板，YAGNI）；F-2 推迟独立立项。
 - [v3.0.0] NexSocket Studio 13 周重构路线未启动。
 
 ---
