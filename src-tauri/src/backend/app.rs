@@ -11,6 +11,7 @@ use tauri::{AppHandle, Manager};
 use tower_http::cors::CorsLayer;
 
 use crate::backend::api::router::build_router;
+use crate::backend::audit::AuditManager;
 use crate::backend::auth::AuthManager;
 use crate::backend::constants::*;
 use crate::backend::eventbus::EventBus;
@@ -33,6 +34,7 @@ pub struct Backend {
     pub event_bus: EventBus,
     pub mock: Arc<MockManager>,
     pub auth: Arc<AuthManager>,
+    pub audit: Arc<AuditManager>,
 }
 
 impl Backend {
@@ -60,6 +62,7 @@ impl Backend {
         let events = Arc::new(EventManager::new(config.clone(), services.clone()));
         let mock = Arc::new(MockManager::new());
         let auth = AuthManager::new_blocking(&data_dir);
+        let audit = AuditManager::new_blocking(&data_dir);
 
         Self {
             config,
@@ -70,6 +73,7 @@ impl Backend {
             event_bus,
             mock,
             auth,
+            audit,
         }
     }
 
@@ -94,6 +98,7 @@ impl Backend {
         let events = Arc::new(EventManager::new(config.clone(), services.clone()));
         let mock = Arc::new(MockManager::new());
         let auth = AuthManager::new_blocking(&data_dir);
+        let audit = AuditManager::new_blocking(&data_dir);
 
         Self {
             config,
@@ -104,6 +109,7 @@ impl Backend {
             event_bus,
             mock,
             auth,
+            audit,
         }
     }
 

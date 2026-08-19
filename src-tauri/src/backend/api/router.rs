@@ -10,6 +10,7 @@ use axum::Router;
 use crate::backend::api::handlers;
 use crate::backend::auth::{auth_middleware, bootstrap};
 use crate::backend::constants::ADMIN_WS_PATH;
+use crate::backend::openapi::openapi_json;
 use crate::backend::state::AppState;
 use crate::backend::ws::admin;
 
@@ -48,6 +49,10 @@ pub fn build_router(state: AppState) -> Router {
         .route("/api/settings", post(handlers::save_settings))
         .route("/api/export", get(handlers::export_config))
         .route("/api/import", post(handlers::import_config))
+        // 审计日志
+        .route("/api/audit/logs", get(handlers::audit_logs))
+        // OpenAPI 3.1 文档（P0-4；swagger-ui 可另行挂载）
+        .route("/api/openapi.json", get(|| async { openapi_json() }))
         // Mock 服务
         .route("/api/mock/list", get(handlers::mock_list))
         .route("/api/mock/get", post(handlers::mock_get))

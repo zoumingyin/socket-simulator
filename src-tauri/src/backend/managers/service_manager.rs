@@ -11,12 +11,8 @@ use std::time::Duration;
 use crate::backend::constants::*;
 use crate::backend::error::BackendError;
 use crate::backend::eventbus::EventBus;
-use crate::backend::transport::http::HttpServer;
-use crate::backend::transport::socketio::SocketIoServer;
-use crate::backend::transport::unified::UnifiedServer;
 use crate::backend::transport::hooks::TransportHooks;
-use crate::backend::transport::websocket::WsServer;
-use crate::backend::transport::Transport;
+use crate::backend::transport::{AdapterKind, AdapterRegistry, ProtocolAdapter};
 use crate::backend::types::*;
 
 use super::client_manager::ClientManager;
@@ -29,8 +25,10 @@ pub struct ServiceManager {
     logs: Arc<LogManager>,
     clients: Arc<ClientManager>,
     event_bus: EventBus,
-    /// serverId -> 运行中的传输层实例（按协议可能为 WsServer 或 SocketIoServer）
-    servers: Arc<Mutex<HashMap<String, Arc<dyn Transport>>>>,
+    /// 协议适配器注册表（P0-5：按 AdapterKind 创建传输实例，插件可注册/覆盖）
+    registry: Arc<AdapterRegistry>,
+    /// serverId -> 运行中的协议适配器实例（经注册表创建，可能为 WsServer / SocketIoServer / HttpServer / UnifiedServer）
+    servers: Arc<Mutex<HashMap<String, Arc<dyn ProtocolAdapter>>>>,
     /// serverId -> 运行时快照
     runtimes: Arc<Mutex<HashMap<String, ServerRuntime>>>,
 }
@@ -47,9 +45,16 @@ impl ServiceManager {
             logs,
             clients,
             event_bus,
+            registry: Arc::new(AdapterRegistry::new()),
             servers: Arc::new(Mutex::new(HashMap::new())),
             runtimes: Arc::new(Mutex::new(HashMap::new())),
         }
+    }
+
+    /// 注入自定义适配器注册表（P2-4 预留协议在此挂载；默认内置四类）
+    pub fn with_registry(mut self, registry: Arc<AdapterRegistry>) -> Self {
+        self.registry = registry;
+        self
     }
 
     /// 用配置中的服务列表初始化运行时快照（全部 Stopped）
@@ -184,7 +189,6 @@ impl ServiceManager {
             }),
         };
 
-        let protocol = cfg.protocol;
         // P0-2: Socket.IO 与 Mock HTTP 共端口不兼容（hyper 1.0 / axum 0.7 与 socketioxide 统一路由冲突）。
         // 显式拒绝该组合，禁止静默进入 Unified（否则 Socket.IO 实际不会启动，协议静默丢失）。
         if cfg.mock_enabled && cfg.protocol == ProtocolType::SocketIo {
@@ -192,37 +196,17 @@ impl ServiceManager {
                 "Socket.IO 协议不支持与 Mock HTTP 共端口（统一路由模式）。请关闭该服务的 Mock，或改用 WebSocket / HTTP 协议。".to_string(),
             ));
         }
-        let transport: Arc<dyn Transport> = if cfg.mock_enabled {
-            // ===== 统一路由模式：Mock HTTP + Socket 共端口 =====
-            // 使用 UnifiedServer，在同一个 axum Router 上同时处理：
-            // - WebSocket 升级请求 → Socket 传输层
-            // - 普通 HTTP 请求 → Mock 引擎（规则匹配 → 模拟响应）
-            // 两者通过 fallback handler 中的 Option<WebSocketUpgrade> 自动区分
-            let unified = Arc::new(UnifiedServer::new(cfg, sys, hooks));
-            unified.start().await?;
-            unified as Arc<dyn Transport>
-        } else {
-            // ===== 独立传输层模式（原有逻辑） =====
-            match protocol {
-            ProtocolType::Websocket => {
-                let ws = Arc::new_cyclic(|weak| WsServer::new(cfg, sys, hooks, weak.clone()));
-                ws.start().await?;
-                ws as Arc<dyn Transport>
-            }
-            ProtocolType::SocketIo => {
-                let sio = Arc::new(SocketIoServer::new(cfg, sys, hooks));
-                sio.start().await?;
-                sio as Arc<dyn Transport>
-            }
-            ProtocolType::Http => {
-                let http = Arc::new(HttpServer::new(cfg, sys, hooks));
-                http.start().await?;
-                http as Arc<dyn Transport>
-            }
-            }
-        };
-
-        self.servers.lock().unwrap().insert(id.clone(), transport);
+        // P0-5: 经适配器注册表创建传输实例（内置：websocket / socketio / http / unified；
+        // 插件可注册新协议并在此自动接管）。
+        let kind = AdapterKind::from_cfg(&cfg);
+        let adapter = self
+            .registry
+            .create(kind, cfg, sys, hooks)
+            .ok_or_else(|| {
+                BackendError::Config(format!("未注册的协议适配器: {}", kind.as_str()))
+            })?;
+        adapter.start().await?;
+        self.servers.lock().unwrap().insert(id.clone(), adapter);
         {
             let mut r = self.runtimes.lock().unwrap();
             let rt = r
@@ -387,8 +371,8 @@ mod tests {
     use crate::backend::managers::config_manager::ConfigManager;
     use crate::backend::managers::log_manager::LogManager;
     use crate::backend::transport::hooks::TransportHooks;
-use crate::backend::transport::websocket::WsServer;
-    use crate::backend::transport::Transport;
+    use crate::backend::transport::websocket::WsServer;
+    use crate::backend::transport::ProtocolAdapter;
     use crate::backend::types::*;
 
     fn tmp_dir() -> std::path::PathBuf {
@@ -458,7 +442,7 @@ use crate::backend::transport::websocket::WsServer;
                 weak.clone(),
             )
         });
-        sm.servers.lock().unwrap().insert("live".to_string(), ws as Arc<dyn Transport>);
+        sm.servers.lock().unwrap().insert("live".to_string(), ws as Arc<dyn ProtocolAdapter>);
         assert!(
             !sm.remove_server("live"),
             "remove_server must refuse while the transport is present"

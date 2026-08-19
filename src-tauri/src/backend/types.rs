@@ -8,7 +8,7 @@ use serde::{Deserialize, Serialize};
 // ======================== 服务配置 ========================
 
 /// 协议类型
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default, specta::Type)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default, specta::Type, utoipa::ToSchema)]
 pub enum ProtocolType {
     #[default]
     #[serde(rename = "websocket")]
@@ -20,7 +20,7 @@ pub enum ProtocolType {
 }
 
 /// HTTP 方法（受管 HTTP 服务的自定义路由可指定）
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, Default, specta::Type)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, Default, specta::Type, utoipa::ToSchema)]
 pub enum HttpMethod {
     #[default]
     #[serde(rename = "GET")]
@@ -59,7 +59,7 @@ impl HttpMethod {
 /// HTTP 路由类型
 /// - Inbound：收消息（body 为 JSON），映射到 on_message
 /// - Stream：SSE 长连接，server→client 单向推送
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default, specta::Type)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default, specta::Type, utoipa::ToSchema)]
 pub enum HttpRouteType {
     #[default]
     #[serde(rename = "inbound")]
@@ -69,7 +69,7 @@ pub enum HttpRouteType {
 }
 
 /// HTTP 自定义路由配置（每个受管 HTTP 服务可配多条）
-#[derive(Debug, Clone, Serialize, Deserialize, Default, specta::Type)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default, specta::Type, utoipa::ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct HttpRouteConfig {
     #[serde(default)]
@@ -89,7 +89,7 @@ pub struct HttpRouteConfig {
 }
 
 /// 日志等级
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default, specta::Type)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default, specta::Type, utoipa::ToSchema)]
 pub enum LogLevel {
     #[default]
     #[serde(rename = "DEBUG")]
@@ -115,7 +115,7 @@ impl LogLevel {
 }
 
 /// 头部/查询匹配条件
-#[derive(Debug, Clone, Serialize, Deserialize, Default, specta::Type)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default, specta::Type, utoipa::ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct MockMatchCondition {
     #[serde(default)]
@@ -146,7 +146,7 @@ fn default_response_body() -> String {
 }
 
 /// Mock 模拟规则
-#[derive(Debug, Clone, Serialize, Deserialize, Default, specta::Type)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default, specta::Type, utoipa::ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct MockRule {
     #[serde(default)]
@@ -181,7 +181,7 @@ pub struct MockRule {
 }
 
 /// Mock 服务配置
-#[derive(Debug, Clone, Serialize, Deserialize, Default, specta::Type)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default, specta::Type, utoipa::ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct MockServiceConfig {
     #[serde(default)]
@@ -215,7 +215,7 @@ pub struct MockServiceConfig {
 }
 
 /// 服务运行状态
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default, specta::Type)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default, specta::Type, utoipa::ToSchema)]
 pub enum ServerStatus {
     #[default]
     #[serde(rename = "stopped")]
@@ -231,7 +231,7 @@ pub enum ServerStatus {
 }
 
 /// 服务配置
-#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type, utoipa::ToSchema)]
 #[serde(rename_all = "camelCase", default)]
 pub struct ServerConfig {
     pub id: String,
@@ -299,7 +299,7 @@ impl Default for ServerConfig {
 }
 
 /// 服务运行时状态
-#[derive(Debug, Clone, Serialize, Deserialize, Default, specta::Type)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default, specta::Type, utoipa::ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct ServerRuntime {
     pub id: String,
@@ -327,7 +327,7 @@ pub struct ServerRuntime {
 // ======================== 事件配置 ========================
 
 /// 事件运行状态
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default, specta::Type)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default, specta::Type, utoipa::ToSchema)]
 pub enum EventStatus {
     #[default]
     #[serde(rename = "enabled")]
@@ -337,7 +337,7 @@ pub enum EventStatus {
 }
 
 /// 事件配置
-#[derive(Debug, Clone, Serialize, Deserialize, Default, specta::Type)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default, specta::Type, utoipa::ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct EventConfig {
     #[serde(default)]
@@ -364,7 +364,7 @@ pub struct EventConfig {
 // ======================== 客户端管理 ========================
 
 /// 客户端连接状态
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default, specta::Type)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default, specta::Type, utoipa::ToSchema)]
 pub enum ClientStatus {
     #[default]
     #[serde(rename = "connected")]
@@ -374,7 +374,7 @@ pub enum ClientStatus {
 }
 
 /// 客户端分组类型
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default, specta::Type)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default, specta::Type, utoipa::ToSchema)]
 pub enum ClientGroupType {
     #[default]
     #[serde(rename = "custom")]
@@ -388,7 +388,7 @@ pub enum ClientGroupType {
 }
 
 /// 客户端信息
-#[derive(Debug, Clone, Serialize, Deserialize, Default, specta::Type)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default, specta::Type, utoipa::ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct ClientInfo {
     pub id: String,
@@ -411,7 +411,7 @@ pub struct ClientInfo {
 // ======================== 日志系统 ========================
 
 /// 日志条目
-#[derive(Debug, Clone, Serialize, Deserialize, Default, specta::Type)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default, specta::Type, utoipa::ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct LogEntry {
     #[serde(default)]
@@ -430,7 +430,7 @@ pub struct LogEntry {
 }
 
 /// 日志过滤条件
-#[derive(Debug, Clone, Default, Deserialize, specta::Type)]
+#[derive(Debug, Clone, Default, Deserialize, specta::Type, utoipa::ToSchema)]
 pub struct LogFilter {
     pub server_id: Option<String>,
     pub level: Option<LogLevel>,
@@ -440,7 +440,7 @@ pub struct LogFilter {
 // ======================== 统计面板 ========================
 
 /// 心跳配置
-#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type, utoipa::ToSchema)]
 #[serde(rename_all = "camelCase", default)]
 pub struct HeartbeatConfig {
     pub enabled: bool,
@@ -461,7 +461,7 @@ impl Default for HeartbeatConfig {
 // ======================== 安全功能 ========================
 
 /// IP 黑名单/白名单
-#[derive(Debug, Clone, Serialize, Deserialize, Default, specta::Type)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default, specta::Type, utoipa::ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct IpAccessList {
     #[serde(default)]
@@ -471,7 +471,7 @@ pub struct IpAccessList {
 }
 
 /// WSS 配置
-#[derive(Debug, Clone, Serialize, Deserialize, Default, specta::Type)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default, specta::Type, utoipa::ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct WssConfig {
     #[serde(default)]
@@ -485,7 +485,7 @@ pub struct WssConfig {
 // ======================== 系统配置 ========================
 
 /// 系统设置
-#[derive(Debug, Clone, Serialize, Deserialize, Default, specta::Type)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default, specta::Type, utoipa::ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct SystemSettings {
     #[serde(default)]
@@ -509,7 +509,7 @@ pub struct SystemSettings {
 }
 
 /// 窗口配置
-#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type, utoipa::ToSchema)]
 #[serde(rename_all = "camelCase", default)]
 pub struct WindowConfig {
     pub width: u32,
@@ -534,7 +534,7 @@ impl Default for WindowConfig {
 // ======================== REST API ========================
 
 /// API 标准响应（与现网 `{ success, data?, errorCode?, error?, message?, timestamp }` 对齐）
-#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type, utoipa::ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct ApiResponse<T> {
     pub success: bool,
@@ -579,7 +579,7 @@ impl<T: Default> Default for ApiResponse<T> {
 // ======================== 传输层抽象（文档化契约） ========================
 
 /// WS 消息帧：`{ "event": string, "data": object }`
-#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type, utoipa::ToSchema)]
 pub struct WsFrame {
     pub event: String,
     pub data: serde_json::Value,
@@ -588,7 +588,7 @@ pub struct WsFrame {
 // ======================== 配置持久化 ========================
 
 /// 持久化配置集合（单 config.json）
-#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type, utoipa::ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct PersistedConfig {
     #[serde(default)]

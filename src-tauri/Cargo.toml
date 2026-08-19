@@ -50,6 +50,8 @@ rustls-pemfile = "2"
 # 前端静态资源嵌入（将 dist/ 编入二进制，由 axum 统一路由提供）
 rust-embed = "8"
 specta = "1.0.5"
+# v3 P0-4：OpenAPI 3.1 生成（契约权威源；utoipa 5.x 默认输出 OpenAPI 3.1 spec）
+utoipa = { version = "5", features = ["macros"] }
 
 # v3 P0-1：SQLite 存储（可替换 Repository 后端，取代单一 config.json）
 # - default-features=false 关掉 sqlx 默认启的 chrono/uuid/runtime 等，按需开启

@@ -1,17 +1,38 @@
 //! 配置导入/导出处理函数（/api/export、/api/import）
 
 use axum::extract::{Json, State};
-use serde_json::Value;
+use axum::http::HeaderMap;
+use serde_json::{Value, json};
 
-use crate::backend::api::handlers::{ok, ok_msg_only, Resp};
+use crate::backend::api::handlers::{audit_log, ok, ok_msg_only, Resp};
 use crate::backend::state::AppState;
 use crate::backend::types::*;
 
+#[utoipa::path(
+    get,
+    path = "/api/export",
+    responses((status = 200, description = "OK"))
+)]
 pub async fn export_config(State(b): State<AppState>) -> Resp {
     ok(serde_json::to_value(b.config.export_all()).unwrap_or(Value::Null))
 }
 
-pub async fn import_config(State(b): State<AppState>, Json(body): Json<PersistedConfig>) -> Resp {
+#[utoipa::path(
+    post,
+    path = "/api/import",
+    request_body = PersistedConfig,
+    responses((status = 200, description = "OK"))
+)]
+pub async fn import_config(
+    State(b): State<AppState>,
+    headers: HeaderMap,
+    Json(body): Json<PersistedConfig>,
+) -> Resp {
+    let summary = json!({
+        "servers": body.servers.len(),
+        "events": body.events.len(),
+        "mockServices": body.mock_services.len(),
+    });
     // 1. 整体替换持久化配置（旧 config 的 templates 等已移除字段由 serde 容忍未知字段自动忽略 → 自动升级）
     b.config.import_all(body.clone());
     b.events.load_events(body.events.clone());
@@ -23,5 +44,15 @@ pub async fn import_config(State(b): State<AppState>, Json(body): Json<Persisted
     let sys = b.config.get_system_settings();
     b.mock.restore(&b.config, &sys).await;
 
+    audit_log(
+        &b,
+        &headers,
+        "config_import",
+        "config",
+        None,
+        summary,
+        true,
+    )
+    .await;
     ok_msg_only("导入成功")
 }

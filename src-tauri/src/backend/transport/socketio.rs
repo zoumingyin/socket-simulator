@@ -225,3 +225,13 @@ impl Transport for SocketIoServer {
         Ok(())
     }
 }
+
+impl crate::backend::transport::ProtocolAdapter for SocketIoServer {
+    fn protocol(&self) -> ProtocolType {
+        ProtocolType::SocketIo
+    }
+
+    fn server_id(&self) -> &str {
+        &self.cfg.id
+    }
+}

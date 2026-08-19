@@ -1,0 +1,1690 @@
+{
+  "components": {
+    "schemas": {
+      "ApiResponse_Value": {
+        "description": "API 标准响应（与现网 `{ success, data?, errorCode?, error?, message?, timestamp }` 对齐）",
+        "properties": {
+          "data": {},
+          "error": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "errorCode": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "message": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "success": {
+            "type": "boolean"
+          },
+          "timestamp": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "success",
+          "timestamp"
+        ],
+        "type": "object"
+      },
+      "AuditEntry": {
+        "description": "单条审计记录",
+        "properties": {
+          "action": {
+            "description": "操作名：server_start / server_update / mock_remove ...",
+            "type": "string"
+          },
+          "actor": {
+            "description": "操作者：admin / viewer / local（鉴权关闭或自举时）",
+            "type": "string"
+          },
+          "detail": {
+            "description": "附加详情（JSON）"
+          },
+          "id": {
+            "type": "string"
+          },
+          "result": {
+            "description": "结果：success / failure",
+            "type": "string"
+          },
+          "targetId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "targetType": {
+            "description": "对象类型：server / mock / event / config / log / client",
+            "type": "string"
+          },
+          "timestamp": {
+            "description": "RFC3339 时间戳",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "timestamp",
+          "actor",
+          "action",
+          "targetType",
+          "result"
+        ],
+        "type": "object"
+      },
+      "AuditPage": {
+        "description": "分页结果",
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/AuditEntry"
+            },
+            "type": "array"
+          },
+          "total": {
+            "format": "int64",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "total",
+          "items"
+        ],
+        "type": "object"
+      },
+      "AuditQuery": {
+        "description": "查询参数（分页 + 可选过滤）",
+        "properties": {
+          "action": {
+            "description": "按操作名精确过滤",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "limit": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "offset": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "targetType": {
+            "description": "按对象类型精确过滤",
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "type": "object"
+      },
+      "ClientDisconnect": {
+        "properties": {
+          "clientId": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "clientId"
+        ],
+        "type": "object"
+      },
+      "ClientGroupType": {
+        "description": "客户端分组类型",
+        "enum": [
+          "custom",
+          "device",
+          "user",
+          "webpage"
+        ],
+        "type": "string"
+      },
+      "ClientInfo": {
+        "description": "客户端信息",
+        "properties": {
+          "connectedAt": {
+            "type": "string"
+          },
+          "group": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/ClientGroupType"
+              }
+            ]
+          },
+          "groupName": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "id": {
+            "type": "string"
+          },
+          "ipAddress": {
+            "type": "string"
+          },
+          "lastActivityAt": {
+            "type": "string"
+          },
+          "metadata": {},
+          "protocol": {
+            "$ref": "#/components/schemas/ProtocolType"
+          },
+          "serverId": {
+            "type": "string"
+          },
+          "socketId": {
+            "type": "string"
+          },
+          "status": {
+            "$ref": "#/components/schemas/ClientStatus"
+          }
+        },
+        "required": [
+          "id",
+          "serverId",
+          "socketId",
+          "ipAddress"
+        ],
+        "type": "object"
+      },
+      "ClientStatus": {
+        "description": "客户端连接状态",
+        "enum": [
+          "connected",
+          "disconnected"
+        ],
+        "type": "string"
+      },
+      "EventConfig": {
+        "description": "事件配置",
+        "properties": {
+          "createdAt": {
+            "type": "string"
+          },
+          "defaultMessage": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "description": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "handler": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "id": {
+            "type": "string"
+          },
+          "isDefault": {
+            "type": "boolean"
+          },
+          "name": {
+            "type": "string"
+          },
+          "pollingEnabled": {
+            "type": "boolean"
+          },
+          "pollingInterval": {
+            "format": "int64",
+            "minimum": 0,
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "serverId": {
+            "type": "string"
+          },
+          "status": {
+            "$ref": "#/components/schemas/EventStatus"
+          },
+          "updatedAt": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "serverId",
+          "name"
+        ],
+        "type": "object"
+      },
+      "EventId": {
+        "properties": {
+          "id": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "type": "object"
+      },
+      "EventStatus": {
+        "description": "事件运行状态",
+        "enum": [
+          "enabled",
+          "disabled"
+        ],
+        "type": "string"
+      },
+      "EventToggle": {
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "status"
+        ],
+        "type": "object"
+      },
+      "HeartbeatConfig": {
+        "description": "心跳配置",
+        "properties": {
+          "enabled": {
+            "default": true,
+            "type": "boolean"
+          },
+          "pingInterval": {
+            "default": 30000,
+            "format": "int64",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "pongTimeout": {
+            "default": 90000,
+            "format": "int64",
+            "minimum": 0,
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
+      "HttpMethod": {
+        "description": "HTTP 方法（受管 HTTP 服务的自定义路由可指定）",
+        "enum": [
+          "GET",
+          "POST",
+          "PUT",
+          "DELETE",
+          "PATCH",
+          "HEAD",
+          "OPTIONS",
+          "ANY"
+        ],
+        "type": "string"
+      },
+      "HttpRouteConfig": {
+        "description": "HTTP 自定义路由配置（每个受管 HTTP 服务可配多条）",
+        "properties": {
+          "description": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "event": {
+            "description": "固定事件名；若 None 且路径含 `{event}` 则取路径段；否则取末段",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "id": {
+            "type": "string"
+          },
+          "method": {
+            "$ref": "#/components/schemas/HttpMethod"
+          },
+          "path": {
+            "description": "路径，支持 `{event}` 占位符（如 `/{event}`、`/order/{event}`）",
+            "type": "string"
+          },
+          "routeType": {
+            "$ref": "#/components/schemas/HttpRouteType"
+          }
+        },
+        "type": "object"
+      },
+      "HttpRouteType": {
+        "description": "HTTP 路由类型\n- Inbound：收消息（body 为 JSON），映射到 on_message\n- Stream：SSE 长连接，server→client 单向推送",
+        "enum": [
+          "inbound",
+          "stream"
+        ],
+        "type": "string"
+      },
+      "IpAccessList": {
+        "description": "IP 黑名单/白名单",
+        "properties": {
+          "blacklist": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "whitelist": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          }
+        },
+        "type": "object"
+      },
+      "LogEntry": {
+        "description": "日志条目",
+        "properties": {
+          "clientId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "event": {
+            "type": "string"
+          },
+          "id": {
+            "type": "string"
+          },
+          "level": {
+            "$ref": "#/components/schemas/LogLevel"
+          },
+          "message": {
+            "type": "string"
+          },
+          "metadata": {},
+          "serverId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "timestamp": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "LogLevel": {
+        "description": "日志等级",
+        "enum": [
+          "DEBUG",
+          "INFO",
+          "WARN",
+          "ERROR"
+        ],
+        "type": "string"
+      },
+      "MockId": {
+        "properties": {
+          "id": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "type": "object"
+      },
+      "MockMatchCondition": {
+        "description": "头部/查询匹配条件",
+        "properties": {
+          "enabled": {
+            "type": "boolean"
+          },
+          "key": {
+            "type": "string"
+          },
+          "matchKind": {
+            "description": "匹配方式：exact / contains / regex / exists",
+            "type": "string"
+          },
+          "value": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "MockRule": {
+        "description": "Mock 模拟规则",
+        "properties": {
+          "description": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "enabled": {
+            "type": "boolean"
+          },
+          "id": {
+            "type": "string"
+          },
+          "matchBody": {
+            "description": "请求体匹配（包含子串；空表示不匹配 body）",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "matchHeaders": {
+            "items": {
+              "$ref": "#/components/schemas/MockMatchCondition"
+            },
+            "type": "array"
+          },
+          "matchQuery": {
+            "items": {
+              "$ref": "#/components/schemas/MockMatchCondition"
+            },
+            "type": "array"
+          },
+          "method": {
+            "$ref": "#/components/schemas/HttpMethod",
+            "description": "HTTP 方法（含 ANY）"
+          },
+          "name": {
+            "type": "string"
+          },
+          "pathPattern": {
+            "description": "路径模式：精确 `/users`、前缀 `/users/*`、参数 `/users/:id`",
+            "type": "string"
+          },
+          "responseBody": {
+            "type": "string"
+          },
+          "responseDelayMs": {
+            "format": "int32",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "responseHeaders": {
+            "items": {
+              "$ref": "#/components/schemas/MockMatchCondition"
+            },
+            "type": "array"
+          },
+          "responseStatusCode": {
+            "format": "int32",
+            "minimum": 0,
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
+      "MockServiceConfig": {
+        "description": "Mock 服务配置",
+        "properties": {
+          "basePath": {
+            "description": "挂载路径（如 `/api/gaop/v1`）；主端口模式下作为前缀；自定义端口模式下作为该端口的根路径",
+            "type": "string"
+          },
+          "createdAt": {
+            "type": "string"
+          },
+          "customPort": {
+            "description": "自定义端口；None = 挂载到主端口 3080",
+            "format": "int32",
+            "minimum": 0,
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "defaultDelayMs": {
+            "format": "int32",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "defaultResponseBody": {
+            "description": "未匹配规则时返回的响应体",
+            "type": "string"
+          },
+          "defaultStatusCode": {
+            "description": "未匹配规则时返回的状态码",
+            "format": "int32",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "description": {
+            "type": "string"
+          },
+          "enabled": {
+            "type": "boolean"
+          },
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "rules": {
+            "items": {
+              "$ref": "#/components/schemas/MockRule"
+            },
+            "type": "array"
+          },
+          "updatedAt": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "PersistedConfig": {
+        "description": "持久化配置集合（单 config.json）",
+        "properties": {
+          "events": {
+            "items": {
+              "$ref": "#/components/schemas/EventConfig"
+            },
+            "type": "array"
+          },
+          "exportedAt": {
+            "type": "string"
+          },
+          "mockServices": {
+            "items": {
+              "$ref": "#/components/schemas/MockServiceConfig"
+            },
+            "type": "array"
+          },
+          "servers": {
+            "items": {
+              "$ref": "#/components/schemas/ServerConfig"
+            },
+            "type": "array"
+          },
+          "systemSettings": {
+            "$ref": "#/components/schemas/SystemSettings"
+          },
+          "version": {
+            "type": "string"
+          },
+          "windowConfig": {
+            "$ref": "#/components/schemas/WindowConfig"
+          }
+        },
+        "type": "object"
+      },
+      "ProtocolType": {
+        "description": "协议类型",
+        "enum": [
+          "websocket",
+          "socket.io",
+          "http"
+        ],
+        "type": "string"
+      },
+      "SendBody": {
+        "properties": {
+          "clientId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "content": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "data": {},
+          "event": {
+            "type": "string"
+          },
+          "messageType": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "serverId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "targetId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "targetType": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "event"
+        ],
+        "type": "object"
+      },
+      "ServerConfig": {
+        "description": "服务配置",
+        "properties": {
+          "autoStart": {
+            "default": false,
+            "type": "boolean"
+          },
+          "certPath": {
+            "default": null,
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "createdAt": {
+            "default": "",
+            "type": "string"
+          },
+          "description": {
+            "default": "",
+            "type": "string"
+          },
+          "httpRoutes": {
+            "default": [],
+            "description": "HTTP 协议自定义路由（仅 protocol=http 生效；为空则用内置默认：\n`POST /{event}` 收消息 + `GET /stream` SSE 推送）",
+            "items": {
+              "$ref": "#/components/schemas/HttpRouteConfig"
+            },
+            "type": "array"
+          },
+          "id": {
+            "default": "",
+            "type": "string"
+          },
+          "ip": {
+            "default": "0.0.0.0",
+            "type": "string"
+          },
+          "keyPath": {
+            "default": null,
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "logLevel": {
+            "default": "INFO",
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/LogLevel"
+              }
+            ]
+          },
+          "mockDefaultDelayMs": {
+            "default": 0,
+            "description": "Mock 默认延迟（ms，未匹配规则时）",
+            "format": "int32",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "mockDefaultResponseBody": {
+            "default": "{\"message\":\"ok\"}",
+            "description": "Mock 默认响应体（未匹配规则时返回）",
+            "type": "string"
+          },
+          "mockDefaultStatusCode": {
+            "default": 200,
+            "description": "Mock 默认状态码（未匹配规则时返回）",
+            "format": "int32",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "mockEnabled": {
+            "default": false,
+            "description": "是否在同一端口上同时提供 Mock HTTP 响应（统一路由模式）。\n启用后，非 WebSocket 升级的 HTTP 请求将由 Mock 引擎处理（规则匹配 → 模拟响应）。\nWebSocket 升级请求（含 `Upgrade: websocket` 头）仍由 Socket 传输层处理。\n两者在同一路由 fallback handler 中通过请求类型自动区分，互不干扰。",
+            "type": "boolean"
+          },
+          "mockRules": {
+            "default": [],
+            "description": "Mock 规则列表（mock_enabled=true 时生效）；按顺序匹配，首个命中即返回",
+            "items": {
+              "$ref": "#/components/schemas/MockRule"
+            },
+            "type": "array"
+          },
+          "name": {
+            "default": "",
+            "type": "string"
+          },
+          "port": {
+            "default": 0,
+            "format": "int32",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "protocol": {
+            "default": "websocket",
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/ProtocolType"
+              }
+            ]
+          },
+          "updatedAt": {
+            "default": "",
+            "type": "string"
+          },
+          "wssEnabled": {
+            "default": false,
+            "type": "boolean"
+          }
+        },
+        "type": "object"
+      },
+      "ServerId": {
+        "properties": {
+          "id": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "type": "object"
+      },
+      "ServerRuntime": {
+        "description": "服务运行时状态",
+        "properties": {
+          "clientCount": {
+            "minimum": 0,
+            "type": "integer"
+          },
+          "error": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "id": {
+            "type": "string"
+          },
+          "receivedBytes": {
+            "format": "int64",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "receivedMessages": {
+            "format": "int64",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "reconnectCount": {
+            "format": "int64",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "sentBytes": {
+            "format": "int64",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "sentMessages": {
+            "format": "int64",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "startedAt": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "status": {
+            "$ref": "#/components/schemas/ServerStatus"
+          },
+          "stoppedAt": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "totalConnections": {
+            "format": "int64",
+            "minimum": 0,
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "type": "object"
+      },
+      "ServerStatus": {
+        "description": "服务运行状态",
+        "enum": [
+          "stopped",
+          "running",
+          "error",
+          "starting",
+          "stopping"
+        ],
+        "type": "string"
+      },
+      "SettingsBody": {
+        "properties": {
+          "systemSettings": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/SystemSettings"
+              }
+            ]
+          },
+          "windowConfig": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/WindowConfig"
+              }
+            ]
+          }
+        },
+        "type": "object"
+      },
+      "SystemSettings": {
+        "description": "系统设置",
+        "properties": {
+          "autoStart": {
+            "type": "boolean"
+          },
+          "heartbeat": {
+            "$ref": "#/components/schemas/HeartbeatConfig"
+          },
+          "id": {
+            "type": "string"
+          },
+          "ipAccess": {
+            "$ref": "#/components/schemas/IpAccessList"
+          },
+          "logRetentionDays": {
+            "format": "int64",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "maxConnectionsPerServer": {
+            "format": "int64",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "startMinimized": {
+            "type": "boolean"
+          },
+          "updatedAt": {
+            "type": "string"
+          },
+          "wss": {
+            "$ref": "#/components/schemas/WssConfig"
+          }
+        },
+        "type": "object"
+      },
+      "WindowConfig": {
+        "description": "窗口配置",
+        "properties": {
+          "height": {
+            "default": 800,
+            "format": "int32",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "maximized": {
+            "default": false,
+            "type": "boolean"
+          },
+          "width": {
+            "default": 1280,
+            "format": "int32",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "x": {
+            "default": null,
+            "format": "int32",
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "y": {
+            "default": null,
+            "format": "int32",
+            "type": [
+              "integer",
+              "null"
+            ]
+          }
+        },
+        "type": "object"
+      },
+      "WssConfig": {
+        "description": "WSS 配置",
+        "properties": {
+          "certPath": {
+            "type": "string"
+          },
+          "enabled": {
+            "type": "boolean"
+          },
+          "keyPath": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      }
+    }
+  },
+  "info": {
+    "description": "Socket 服务管理平台后端 REST API（OpenAPI 3.1）。鉴权：Bearer token（`SSM_AUTH_ENABLED=1` 时生效）；`GET /api/auth/bootstrap` 回环自举获取 admin token。",
+    "license": {
+      "name": ""
+    },
+    "title": "NexSocket Studio · 管理面 API",
+    "version": "3.0.0"
+  },
+  "openapi": "3.1.0",
+  "paths": {
+    "/api/audit/logs": {
+      "get": {
+        "operationId": "audit_logs",
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "tags": []
+      }
+    },
+    "/api/auth/bootstrap": {
+      "get": {
+        "operationId": "bootstrap",
+        "responses": {
+          "200": {
+            "description": "返回 admin token 与角色（回环自举，免鉴权）"
+          }
+        },
+        "summary": "本地自举端点：返回 admin token（供前端 P1 接入鉴权）",
+        "tags": [
+          "crate::backend::auth"
+        ]
+      }
+    },
+    "/api/client/disconnect": {
+      "post": {
+        "operationId": "client_disconnect",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ClientDisconnect"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "tags": []
+      }
+    },
+    "/api/client/send": {
+      "post": {
+        "operationId": "client_send",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SendBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "tags": []
+      }
+    },
+    "/api/clients": {
+      "get": {
+        "operationId": "get_clients",
+        "parameters": [
+          {
+            "description": "按服务 ID 过滤",
+            "in": "query",
+            "name": "serverId",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "tags": []
+      }
+    },
+    "/api/events": {
+      "get": {
+        "operationId": "get_events",
+        "parameters": [
+          {
+            "description": "按服务 ID 过滤",
+            "in": "query",
+            "name": "serverId",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "tags": []
+      }
+    },
+    "/api/events/add": {
+      "post": {
+        "operationId": "event_add",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EventConfig"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "tags": []
+      }
+    },
+    "/api/events/remove": {
+      "post": {
+        "operationId": "event_remove",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EventId"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "tags": []
+      }
+    },
+    "/api/events/toggle": {
+      "post": {
+        "operationId": "event_toggle",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EventToggle"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "tags": []
+      }
+    },
+    "/api/events/update": {
+      "post": {
+        "operationId": "event_update",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EventConfig"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "tags": []
+      }
+    },
+    "/api/export": {
+      "get": {
+        "operationId": "export_config",
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "tags": []
+      }
+    },
+    "/api/import": {
+      "post": {
+        "operationId": "import_config",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PersistedConfig"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "tags": []
+      }
+    },
+    "/api/logs": {
+      "get": {
+        "operationId": "get_logs",
+        "parameters": [
+          {
+            "description": "按服务 ID 过滤",
+            "in": "query",
+            "name": "serverId",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "日志级别：DEBUG/INFO/WARN/ERROR",
+            "in": "query",
+            "name": "level",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "关键词过滤",
+            "in": "query",
+            "name": "keyword",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "tags": []
+      }
+    },
+    "/api/logs/clear": {
+      "post": {
+        "operationId": "logs_clear",
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "tags": []
+      }
+    },
+    "/api/mock/add": {
+      "post": {
+        "operationId": "mock_add",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MockServiceConfig"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "tags": []
+      }
+    },
+    "/api/mock/get": {
+      "post": {
+        "operationId": "mock_get",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MockId"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "tags": []
+      }
+    },
+    "/api/mock/list": {
+      "get": {
+        "operationId": "mock_list",
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "tags": []
+      }
+    },
+    "/api/mock/remove": {
+      "post": {
+        "operationId": "mock_remove",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MockId"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "tags": []
+      }
+    },
+    "/api/mock/start": {
+      "post": {
+        "operationId": "mock_start",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MockId"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "tags": []
+      }
+    },
+    "/api/mock/stop": {
+      "post": {
+        "operationId": "mock_stop",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MockId"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "tags": []
+      }
+    },
+    "/api/mock/update": {
+      "post": {
+        "operationId": "mock_update",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MockServiceConfig"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "tags": []
+      }
+    },
+    "/api/send-message": {
+      "post": {
+        "operationId": "send_message",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SendBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "tags": []
+      }
+    },
+    "/api/server/add": {
+      "post": {
+        "operationId": "server_add",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ServerConfig"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "tags": []
+      }
+    },
+    "/api/server/list": {
+      "get": {
+        "operationId": "get_server_list",
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "tags": []
+      }
+    },
+    "/api/server/remove": {
+      "post": {
+        "operationId": "server_remove",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ServerId"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "tags": []
+      }
+    },
+    "/api/server/restart": {
+      "post": {
+        "operationId": "server_restart",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ServerId"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "tags": []
+      }
+    },
+    "/api/server/restart-all": {
+      "post": {
+        "operationId": "server_restart_all",
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "tags": []
+      }
+    },
+    "/api/server/runtimes": {
+      "get": {
+        "operationId": "get_server_runtimes",
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "tags": []
+      }
+    },
+    "/api/server/start": {
+      "post": {
+        "operationId": "server_start",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ServerId"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "tags": []
+      }
+    },
+    "/api/server/start-all": {
+      "post": {
+        "operationId": "server_start_all",
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "tags": []
+      }
+    },
+    "/api/server/stop": {
+      "post": {
+        "operationId": "server_stop",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ServerId"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "tags": []
+      }
+    },
+    "/api/server/stop-all": {
+      "post": {
+        "operationId": "server_stop_all",
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "tags": []
+      }
+    },
+    "/api/server/update": {
+      "post": {
+        "operationId": "server_update",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ServerConfig"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "tags": []
+      }
+    },
+    "/api/servers": {
+      "get": {
+        "operationId": "get_servers",
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "tags": []
+      }
+    },
+    "/api/settings": {
+      "get": {
+        "operationId": "get_settings",
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "tags": []
+      },
+      "post": {
+        "operationId": "save_settings",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SettingsBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "tags": []
+      }
+    }
+  },
+  "servers": [
+    {
+      "description": "本地回环（默认绑定）",
+      "url": "http://127.0.0.1:3080"
+    }
+  ]
+}

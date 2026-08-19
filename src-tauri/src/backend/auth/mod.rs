@@ -209,6 +209,11 @@ pub async fn auth_middleware(State(auth): State<Arc<AuthManager>>, req: Request,
 }
 
 /// 本地自举端点：返回 admin token（供前端 P1 接入鉴权）
+#[utoipa::path(
+    get,
+    path = "/api/auth/bootstrap",
+    responses((status = 200, description = "返回 admin token 与角色（回环自举，免鉴权）"))
+)]
 pub async fn bootstrap(State(auth): State<Arc<AuthManager>>) -> impl IntoResponse {
     Json(BootstrapResponse {
         token: auth.admin_token().to_string(),

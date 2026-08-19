@@ -5,6 +5,7 @@
 
 pub mod api;
 pub mod app;
+pub mod audit;
 pub mod constants;
 pub mod error;
 pub mod eventbus;
@@ -12,6 +13,7 @@ pub mod frontend;
 pub mod managers;
 pub mod mock;
 pub mod net;
+pub mod openapi;
 pub mod repository;
 pub mod auth;
 pub mod state;

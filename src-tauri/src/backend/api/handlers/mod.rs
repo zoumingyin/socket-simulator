@@ -7,11 +7,15 @@
 //! 每个处理函数统一返回 `(StatusCode, Json<ApiResponse<Value>>)`，
 //! 与现网 `{ success, data?, errorCode?, error?, message?, timestamp }` 契约一致。
 
+use axum::http::HeaderMap;
 use axum::http::StatusCode;
 use serde_json::Value;
 
+use crate::backend::app::Backend;
+use crate::backend::audit::record_audit;
 use crate::backend::types::{ApiResponse, now_rfc3339};
 
+pub mod audit;
 pub mod clients;
 pub mod config;
 pub mod events;
@@ -20,6 +24,7 @@ pub mod mock;
 pub mod servers;
 pub mod settings;
 
+pub use audit::*;
 pub use clients::*;
 pub use config::*;
 pub use events::*;
@@ -29,6 +34,21 @@ pub use servers::*;
 pub use settings::*;
 
 type Resp = (StatusCode, axum::Json<ApiResponse<Value>>);
+
+/// 关键操作审计埋点（P0-3）：成功/失败均记录；审计为旁路，失败不阻断业务。
+/// actor 从请求头 Bearer token 解析（鉴权关闭时视为 admin）。
+pub(crate) async fn audit_log(
+    b: &Backend,
+    headers: &HeaderMap,
+    action: &str,
+    target_type: &str,
+    target_id: Option<String>,
+    detail: Value,
+    success: bool,
+) {
+    let role = crate::backend::audit::actor_role(b, headers).await;
+    record_audit(b, role, action, target_type, target_id, detail, success).await;
+}
 
 // ==================== 响应辅助 ====================
 

@@ -197,6 +197,16 @@ impl Transport for HttpServer {
     }
 }
 
+impl crate::backend::transport::ProtocolAdapter for HttpServer {
+    fn protocol(&self) -> ProtocolType {
+        ProtocolType::Http
+    }
+
+    fn server_id(&self) -> &str {
+        &self.cfg.id
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

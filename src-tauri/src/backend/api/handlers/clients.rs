@@ -3,20 +3,21 @@
 use std::collections::HashMap;
 
 use axum::extract::{Json, Query, State};
+use axum::http::HeaderMap;
 use serde::Deserialize;
-use serde_json::Value;
+use serde_json::{Value, json};
 
-use crate::backend::api::handlers::{err, ok, ok_msg_only, Resp};
+use crate::backend::api::handlers::{audit_log, err, ok, ok_msg_only, Resp};
 use crate::backend::constants::CLIENT_ID_SEP;
 use crate::backend::state::AppState;
 
-#[derive(Deserialize)]
+#[derive(Deserialize, utoipa::ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct ClientDisconnect {
     client_id: String,
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, utoipa::ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct SendBody {
     server_id: Option<String>,
@@ -29,6 +30,14 @@ pub(crate) struct SendBody {
     client_id: Option<String>,
 }
 
+#[utoipa::path(
+    get,
+    path = "/api/clients",
+    params(
+        ("serverId" = Option<String>, Query, description = "按服务 ID 过滤"),
+    ),
+    responses((status = 200, description = "OK"))
+)]
 pub async fn get_clients(
     State(b): State<AppState>,
     Query(q): Query<HashMap<String, String>>,
@@ -38,8 +47,15 @@ pub async fn get_clients(
     ok(serde_json::to_value(clients).unwrap_or(Value::Null))
 }
 
+#[utoipa::path(
+    post,
+    path = "/api/client/disconnect",
+    request_body = ClientDisconnect,
+    responses((status = 200, description = "OK"))
+)]
 pub async fn client_disconnect(
     State(b): State<AppState>,
+    headers: HeaderMap,
     Json(body): Json<ClientDisconnect>,
 ) -> Resp {
     let (server_id, actual) = match body.client_id.split_once(CLIENT_ID_SEP) {
@@ -47,15 +63,51 @@ pub async fn client_disconnect(
         None => (String::new(), body.client_id.clone()),
     };
     match b.services.disconnect_client(&server_id, &actual).await {
-        Ok(()) => ok_msg_only("客户端已断开"),
-        Err(e) => err(e.error_code(), e.to_string(), e.status_code()),
+        Ok(()) => {
+            audit_log(
+                &b,
+                &headers,
+                "client_disconnect",
+                "client",
+                Some(body.client_id.clone()),
+                json!({}),
+                true,
+            )
+            .await;
+            ok_msg_only("客户端已断开")
+        }
+        Err(e) => {
+            audit_log(
+                &b,
+                &headers,
+                "client_disconnect",
+                "client",
+                Some(body.client_id.clone()),
+                json!({ "error": e.to_string() }),
+                false,
+            )
+            .await;
+            err(e.error_code(), e.to_string(), e.status_code())
+        }
     }
 }
 
+#[utoipa::path(
+    post,
+    path = "/api/client/send",
+    request_body = SendBody,
+    responses((status = 200, description = "OK"))
+)]
 pub async fn client_send(State(b): State<AppState>, Json(body): Json<SendBody>) -> Resp {
     send_via(b, body).await
 }
 
+#[utoipa::path(
+    post,
+    path = "/api/send-message",
+    request_body = SendBody,
+    responses((status = 200, description = "OK"))
+)]
 pub async fn send_message(State(b): State<AppState>, Json(body): Json<SendBody>) -> Resp {
     send_via(b, body).await
 }

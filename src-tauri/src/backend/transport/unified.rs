@@ -468,6 +468,20 @@ impl Transport for UnifiedServer {
     }
 }
 
+impl crate::backend::transport::ProtocolAdapter for UnifiedServer {
+    fn protocol(&self) -> ProtocolType {
+        self.cfg.protocol
+    }
+
+    fn server_id(&self) -> &str {
+        &self.cfg.id
+    }
+
+    fn is_unified(&self) -> bool {
+        true
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

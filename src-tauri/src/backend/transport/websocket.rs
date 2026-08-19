@@ -240,6 +240,16 @@ impl Transport for WsServer {
 }
 
 /// 加载 TLS 证书，构造 TlsAcceptor；失败返回 None（调用方降级纯 WS）
+impl crate::backend::transport::ProtocolAdapter for WsServer {
+    fn protocol(&self) -> ProtocolType {
+        ProtocolType::Websocket
+    }
+
+    fn server_id(&self) -> &str {
+        &self.cfg.id
+    }
+}
+
 fn load_tls_acceptor(cfg: &ServerConfig) -> Option<TlsAcceptor> {
     let cert_path = cfg.cert_path.as_ref()?;
     let key_path = cfg.key_path.as_ref()?;
