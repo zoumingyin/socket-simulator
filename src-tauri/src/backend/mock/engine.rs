@@ -51,7 +51,6 @@ pub async fn dispatch(endpoint: &MockEndpoint, req: &MockRequest<'_>) -> Respons
                 rule.response_status_code,
                 &rule.response_headers,
                 &rule.response_body,
-                rule.response_delay_ms,
             );
         }
     }
@@ -62,7 +61,6 @@ pub async fn dispatch(endpoint: &MockEndpoint, req: &MockRequest<'_>) -> Respons
     let tmp = MockServiceConfig {
         default_status_code: endpoint.default_status_code,
         default_response_body: endpoint.default_response_body.clone(),
-        default_delay_ms: endpoint.default_delay_ms,
         ..Default::default()
     };
     default_response(&tmp)
