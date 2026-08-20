@@ -72,7 +72,15 @@ export const techDarkComponentTokens = {
 } as const;
 
 export const lightThemeTokens = {
-  colorPrimary: '#1677ff',
+  // 品牌青绿（与 Logo W1x-a #00D9A0 同色相，深一档保证白字可读）
+  colorPrimary: '#00a67e',
+  colorInfo: '#00a67e',
+  colorSuccess: '#22d3a6',
+  colorWarning: '#f0b429',
+  colorError: '#ff5c7a',
+  colorPrimaryBg: '#e6f9f3',
   colorBgBase: '#ffffff',
   colorTextBase: '#000000',
+  colorBorder: '#d9e6e2',
+  borderRadius: 8,
 } as const;

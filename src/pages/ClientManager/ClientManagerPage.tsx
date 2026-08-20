@@ -176,7 +176,7 @@ export function ClientManagerPage(): React.ReactElement {
       {/* 标题栏 */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
         <div style={{ display: 'flex', alignItems: 'center' }}>
-          <TeamOutlined style={{ fontSize: 20, marginRight: 8, color: '#1677ff' }} />
+          <TeamOutlined style={{ fontSize: 20, marginRight: 8, color: '#00a67e' }} />
           <Title level={4} style={{ margin: 0, fontSize: 18 }}>客户端管理</Title>
           {loading && <Spin size="small" style={{ marginLeft: 12 }} />}
         </div>

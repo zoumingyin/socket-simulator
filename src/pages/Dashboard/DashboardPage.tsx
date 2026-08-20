@@ -170,7 +170,7 @@ export function DashboardPage(): React.ReactElement {
       >
         <div style={{ display: "flex", alignItems: "center" }}>
           <ApiOutlined
-            style={{ fontSize: 20, marginRight: 8, color: "#1677ff" }}
+            style={{ fontSize: 20, marginRight: 8, color: "#00a67e" }}
           />
           <Title level={4} style={{ margin: 0, fontSize: 18 }}>
             统计面板
@@ -179,7 +179,7 @@ export function DashboardPage(): React.ReactElement {
         <Tooltip title="刷新数据">
           <Spin spinning={refreshing}>
             <ThunderboltOutlined
-              style={{ fontSize: 20, cursor: "pointer", color: "#1677ff" }}
+              style={{ fontSize: 20, cursor: "pointer", color: "#00a67e" }}
               onClick={handleRefresh}
             />
           </Spin>
@@ -195,7 +195,7 @@ export function DashboardPage(): React.ReactElement {
               value={runningCount}
               suffix={`/ ${servers.length}`}
               prefix={<CloudServerOutlined />}
-              valueStyle={{ color: "#1677ff" }}
+              valueStyle={{ color: "#00a67e" }}
             />
             <Progress
               percent={

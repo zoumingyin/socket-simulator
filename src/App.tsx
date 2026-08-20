@@ -131,7 +131,7 @@ function AppLayout(): React.ReactElement {
               level={5}
               style={{
                 margin: 0,
-                color: isDark ? "#00d4ff" : "#1677ff",
+                color: isDark ? "#00d4ff" : "#00a67e",
                 fontSize: 13,
                 fontWeight: 600,
               }}

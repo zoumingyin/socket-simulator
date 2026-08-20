@@ -344,7 +344,7 @@ export function SettingsPage(): React.ReactElement {
     <div>
       {contextHolder}
       <div style={{ display: 'flex', alignItems: 'center', marginBottom: 16 }}>
-        <SettingOutlined style={{ fontSize: 20, marginRight: 8, color: '#1677ff' }} />
+        <SettingOutlined style={{ fontSize: 20, marginRight: 8, color: '#00a67e' }} />
         <Title level={4} style={{ margin: 0, fontSize: 18 }}>系统设置</Title>
       </div>
       
