@@ -184,7 +184,31 @@ pub fn extract_bearer(req: &Request) -> Option<String> {
     bearer_from_header(header)
 }
 
-/// 鉴权中间件：enabled 时校验 Bearer token，否则直通
+/// 只读方法判定：viewer 角色仅允许读取类方法
+fn is_readonly_method(method: &axum::http::Method) -> bool {
+    matches!(
+        method,
+        &axum::http::Method::GET | &axum::http::Method::HEAD | &axum::http::Method::OPTIONS
+    )
+}
+
+/// viewer 只读强制：viewer + 非只读方法 → 返回 403 响应（None 表示放行）
+pub fn viewer_write_forbidden(role: Role, method: &axum::http::Method) -> Option<Response> {
+    if role == Role::Viewer && !is_readonly_method(method) {
+        Some((
+            StatusCode::FORBIDDEN,
+            Json(json!({
+                "error": "forbidden",
+                "message": "viewer 角色只读，禁止写操作"
+            })),
+        )
+            .into_response())
+    } else {
+        None
+    }
+}
+
+/// 鉴权中间件：enabled 时校验 Bearer token（viewer 只读强制），否则直通
 pub async fn auth_middleware(State(auth): State<Arc<AuthManager>>, req: Request, next: Next) -> Response {
     if !auth.enabled() {
         return next.run(req).await;
@@ -194,7 +218,11 @@ pub async fn auth_middleware(State(auth): State<Arc<AuthManager>>, req: Request,
         return next.run(req).await;
     }
     if let Some(token) = extract_bearer(&req) {
-        if auth.verify(&token).await.is_some() {
+        if let Some(role) = auth.verify(&token).await {
+            // viewer 只读：写操作直接 403（方法判定先于 req move）
+            if let Some(resp) = viewer_write_forbidden(role, req.method()) {
+                return resp;
+            }
             return next.run(req).await;
         }
     }
@@ -265,5 +293,46 @@ mod tests {
         assert_eq!(bearer_from_header("Basic xyz"), None);
         assert_eq!(bearer_from_header("abc"), None);
         assert_eq!(bearer_from_header(""), None);
+    }
+
+    #[test]
+    fn readonly_method_judgment() {
+        use axum::http::Method;
+        assert!(is_readonly_method(&Method::GET));
+        assert!(is_readonly_method(&Method::HEAD));
+        assert!(is_readonly_method(&Method::OPTIONS));
+        assert!(!is_readonly_method(&Method::POST));
+        assert!(!is_readonly_method(&Method::PUT));
+        assert!(!is_readonly_method(&Method::PATCH));
+        assert!(!is_readonly_method(&Method::DELETE));
+    }
+
+    #[test]
+    fn viewer_write_forbidden_blocks_writes_allows_reads() {
+        use axum::http::Method;
+        // viewer + 写 → 403
+        let resp = viewer_write_forbidden(Role::Viewer, &Method::POST)
+            .expect("viewer POST 应被拦截");
+        assert_eq!(resp.status(), StatusCode::FORBIDDEN);
+        assert!(viewer_write_forbidden(Role::Viewer, &Method::PUT).is_some());
+        assert!(viewer_write_forbidden(Role::Viewer, &Method::DELETE).is_some());
+        // viewer + 读 → 放行
+        assert!(viewer_write_forbidden(Role::Viewer, &Method::GET).is_none());
+        assert!(viewer_write_forbidden(Role::Viewer, &Method::HEAD).is_none());
+        // admin 全权（含写）
+        assert!(viewer_write_forbidden(Role::Admin, &Method::POST).is_none());
+        assert!(viewer_write_forbidden(Role::Admin, &Method::DELETE).is_none());
+    }
+
+    #[tokio::test]
+    async fn verify_returns_viewer_role_for_viewer_token() {
+        let dir = tmp_dir();
+        let mgr = AuthManager::new_async(dir.as_path()).await;
+        sqlx::query("INSERT INTO tokens (token, role) VALUES ('viewer-token', 'viewer')")
+            .execute(&mgr.pool)
+            .await
+            .unwrap();
+        assert_eq!(mgr.verify("viewer-token").await, Some(Role::Viewer));
+        assert_eq!(mgr.verify(&mgr.admin_token()).await, Some(Role::Admin));
     }
 }

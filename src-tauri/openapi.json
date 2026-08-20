@@ -646,7 +646,11 @@
         "enum": [
           "websocket",
           "socket.io",
-          "http"
+          "http",
+          "tcp",
+          "udp",
+          "mqtt",
+          "sse"
         ],
         "type": "string"
       },

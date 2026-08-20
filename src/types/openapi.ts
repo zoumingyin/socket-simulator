@@ -918,7 +918,7 @@ export interface components {
          * @description 协议类型
          * @enum {string}
          */
-        ProtocolType: "websocket" | "socket.io" | "http";
+        ProtocolType: "websocket" | "socket.io" | "http" | "tcp" | "udp" | "mqtt" | "sse";
         /** @description 场景配置（多服务编排：有序服务组，一键启停） */
         SceneConfig: {
             createdAt?: string;
