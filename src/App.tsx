@@ -171,6 +171,9 @@ function AppLayout(): React.ReactElement {
           <div
             style={{
               flexShrink: 0,
+              position: "absolute",
+              bottom: 0,
+              left: 0,
               padding: "10px 0 10px 12px",
               textAlign: "left",
               fontSize: 11,
