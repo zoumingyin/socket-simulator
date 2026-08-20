@@ -1,8 +1,8 @@
 {
   "$schema": "https://schema.tauri.app/v2/config.json",
-  "productName": "Socket 服务管理平台",
-  "version": "3.0.0",
-  "identifier": "com.socket-service-manager",
+  "productName": "NexHub Studio",
+  "version": "3.1.0",
+  "identifier": "com.nexhub.studio",
   "build": {
     "beforeDevCommand": {
       "script": "node node_modules/vite/bin/vite.js",

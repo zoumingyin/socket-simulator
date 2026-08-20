@@ -37,6 +37,42 @@ pub struct Backend {
     pub audit: Arc<AuditManager>,
 }
 
+/// 旧品牌（com.socket-service-manager）数据目录名，用于改名后首次启动迁移
+const LEGACY_DATA_DIR_NAME: &str = "com.socket-service-manager";
+
+/// 若新数据目录不存在而旧目录存在，则整体复制旧目录内容到新位置。
+/// 幂等：新目录一旦存在（已迁移或全新）即跳过，不覆盖用户新数据。
+fn migrate_legacy_data_dir(data_dir: &std::path::Path) {
+    if data_dir.exists() {
+        return;
+    }
+    let Some(parent) = data_dir.parent() else { return };
+    let legacy = parent.join(LEGACY_DATA_DIR_NAME);
+    if !legacy.is_dir() {
+        return;
+    }
+    if std::fs::create_dir_all(data_dir).is_err() {
+        return;
+    }
+    let _ = copy_dir_recursive(&legacy, data_dir);
+}
+
+/// 递归复制目录内容（文件与子目录）
+fn copy_dir_recursive(src: &std::path::Path, dst: &std::path::Path) -> std::io::Result<()> {
+    for entry in std::fs::read_dir(src)? {
+        let entry = entry?;
+        let ty = entry.file_type()?;
+        let to = dst.join(entry.file_name());
+        if ty.is_dir() {
+            std::fs::create_dir_all(&to)?;
+            copy_dir_recursive(&entry.path(), &to)?;
+        } else {
+            std::fs::copy(entry.path(), &to)?;
+        }
+    }
+    Ok(())
+}
+
 impl Backend {
     /// 在 Tauri setup 中构造后端（数据目录使用 app_data_dir）
     pub fn new(app: AppHandle) -> Self {
@@ -44,6 +80,9 @@ impl Backend {
             .path()
             .app_data_dir()
             .unwrap_or_else(|_| std::path::PathBuf::from("."));
+        // 品牌改名（com.socket-service-manager → com.nexhub.studio）后，
+        // 首次启动把旧数据目录整体迁移到新位置，避免老用户数据丢失
+        migrate_legacy_data_dir(&data_dir);
         let config_dir = data_dir.join("config");
         let log_dir = data_dir.join("logs");
 

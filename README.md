@@ -1,6 +1,8 @@
-# Socket 服务管理平台
+# NexHub Studio
 
-<p align="center"><img src="src-tauri/icons/icon.png" width="96" alt="Socket 服务管理平台" /></p>
+> 多协议服务管理平台（WebSocket / Socket.IO / HTTP / Mock）
+
+<p align="center"><img src="src-tauri/icons/icon.png" width="96" alt="NexHub Studio" /></p>
 
 基于 **Tauri 2** 的桌面应用，用于统一管理、监控与调试 **WebSocket / Socket.IO / HTTP** 服务与 **Mock HTTP**。前端提供可视化控制台，**后端由 Rust 实现并直接集成进 Tauri 进程**（不再依赖独立的 Node.js 后端），负责服务生命周期、客户端连接、事件调度与 REST API；管理界面通过 **纯 WebSocket 管理通道**（`ws://localhost:3080/admin/ws`）实时接收日志、客户端列表与服务运行状态。
 
@@ -69,7 +71,7 @@ flowchart LR
 ## 目录结构
 
 ```
-socket-service-manager/
+nexhub-studio/
 ├── src/                    # React 前端
 │   ├── pages/              # 各功能页面
 │   ├── store/              # Zustand 状态
@@ -85,7 +87,7 @@ socket-service-manager/
 └── dist/                   # 前端构建产物（git 忽略）
 ```
 
-> 运行时数据不在仓库内：位于系统应用数据目录（Windows 默认 `%APPDATA%\com.socket-service-manager`）。
+> 运行时数据不在仓库内：位于系统应用数据目录（Windows 默认 `%APPDATA%\com.nexhub.studio`）。
 
 ## 环境要求
 
@@ -140,13 +142,13 @@ npm run dev          # 仅起 Vite 前端（浏览器访问 :4173）
 npx tauri build      # beforeBuildCommand 自动 tsc && vite build，输出 NSIS 安装包
 ```
 
-安装包路径示例：`src-tauri/target/release/bundle/nsis/Socket 服务管理平台_x64-setup.exe`
+安装包路径示例：`src-tauri/target/release/bundle/nsis/NexHub Studio_x64-setup.exe`
 
 > 后端已编译进 Tauri 二进制，安装包即包含完整前后端，无需额外部署 Node 后端。
 
 ## 数据存储
 
-运行时数据位于系统**应用数据目录**（`app_data_dir`，Windows 默认 `%APPDATA%\com.socket-service-manager`，可用 `SSM_DATA_DIR` 覆盖）：
+运行时数据位于系统**应用数据目录**（`app_data_dir`，Windows 默认 `%APPDATA%\com.nexhub.studio`，可用 `SSM_DATA_DIR` 覆盖）：
 
 | 文件 | 内容 |
 |------|------|
@@ -158,6 +160,7 @@ npx tauri build      # beforeBuildCommand 自动 tsc && vite build，输出 NSIS
 | `audit.db` | 审计日志 |
 
 > 新电脑首次运行会自动初始化全部数据文件（空配置 + 新 admin token）。迁移数据：拷贝整个数据目录即可。
+> 自 v3.0.0 升级（品牌改名）：首次启动会自动检测旧目录 `%APPDATA%\com.socket-service-manager` 并整体迁移到新目录，无需手动拷贝。
 
 ## 系统托盘（桌面版）
 
@@ -222,7 +225,7 @@ npx tsc --noEmit                                          # 0 errors
 确认 `npx tauri dev` 已正常拉起 Vite（4173 端口），并与 `tauri.conf.json` 中 `devUrl` 一致。
 
 **数据在哪 / 想迁移到新电脑**  
-见「数据存储」：默认在 `%APPDATA%\com.socket-service-manager`，拷贝整个目录即可迁移（含 token 与配置）。
+见「数据存储」：默认在 `%APPDATA%\com.nexhub.studio`，拷贝整个目录即可迁移（含 token 与配置）。
 
 ## 已知限制
 

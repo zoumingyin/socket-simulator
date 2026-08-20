@@ -143,7 +143,7 @@ function AppLayout(): React.ReactElement {
                 fontWeight: 600,
               }}
             >
-              Socket 管理平台
+              NexHub Studio
             </Typography.Title>
             <Switch
               checked={isDark}
