@@ -3,6 +3,8 @@ name = "socket-service-manager"
 version = "2.0.0"
 edition = "2021"
 description = "Socket 服务管理平台"
+# 多 bin（benchmark / export_openapi / export_types）下 `cargo run` 默认运行主应用
+default-run = "socket-service-manager"
 
 [lib]
 name = "socket_service_manager"
