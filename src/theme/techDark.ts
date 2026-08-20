@@ -79,7 +79,7 @@ export const lightThemeTokens = {
   colorWarning: '#f0b429',
   colorError: '#ff5c7a',
   colorPrimaryBg: '#e6f9f3',
-  colorBgBase: '#ffffff',
+  colorBgBase: '#f4faf7',
   colorTextBase: '#000000',
   colorBorder: '#d9e6e2',
   borderRadius: 8,

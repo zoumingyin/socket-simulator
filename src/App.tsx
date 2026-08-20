@@ -114,7 +114,11 @@ function AppLayout(): React.ReactElement {
           width={200}
           theme={isDark ? "dark" : "light"}
           className={isDark ? "tech-shell-sider" : undefined}
-          style={{ height: "100vh", overflow: "auto" }}
+          style={{
+            height: "100vh",
+            overflow: "auto",
+            background: isDark ? undefined : "#f2f8f5",
+          }}
         >
           <div
             className={isDark ? "tech-shell-brand" : undefined}
@@ -166,7 +170,7 @@ function AppLayout(): React.ReactElement {
             flexDirection: "column",
             height: "100vh",
             overflow: "hidden",
-            background: isDark ? "#070b14" : "#f5f5f5",
+            background: isDark ? "#070b14" : "#e9f2ee",
           }}
         >
           <Layout.Content
@@ -175,7 +179,7 @@ function AppLayout(): React.ReactElement {
               margin: 12,
               flex: 1,
               overflow: "auto",
-              background: isDark ? "#0c1220" : "#fff",
+              background: isDark ? "#0c1220" : "#f7fbf9",
               borderRadius: 10,
               padding: 16,
             }}
