@@ -172,7 +172,7 @@ export function MockWorkbench({
               <Title level={5} style={{ margin: '0 0 10px', fontSize: 13, fontWeight: 600 }}>默认响应</Title>
               <Text type="secondary" style={{ fontSize: 12, display: 'block', marginBottom: 10 }}>未命中任何规则时返回</Text>
               <Form.Item name="mockDefaultStatusCode" label="状态码" rules={[{ required: true }]} style={{ marginBottom: 8 }}>
-                <StatusCodeSelect allowCustom style={{ width: '100%' }} />
+                <StatusCodeSelect style={{ width: '100%' }} />
               </Form.Item>
               <Form.Item name="mockDefaultDelayMs" label="延迟 (ms)" style={{ marginBottom: 0 }}>
                 <InputNumber min={0} max={60000} style={{ width: '100%' }} />

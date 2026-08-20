@@ -4,28 +4,59 @@ export const MOCK_METHODS: HttpMethod[] = ['GET', 'POST', 'PUT', 'DELETE', 'PATC
 export const TEST_METHODS: HttpMethod[] = ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'HEAD', 'OPTIONS'];
 export const MATCH_KINDS: MatchKind[] = ['exact', 'contains', 'regex', 'exists'];
 
-/** 常用 HTTP 状态码（下拉框选项，value 为数字状态码） */
-export const HTTP_STATUS_CODES: Array<{ value: number; label: string }> = [
-  { value: 200, label: '200 OK' },
-  { value: 201, label: '201 Created' },
-  { value: 202, label: '202 Accepted' },
-  { value: 204, label: '204 No Content' },
-  { value: 301, label: '301 Moved Permanently' },
-  { value: 302, label: '302 Found' },
-  { value: 304, label: '304 Not Modified' },
-  { value: 400, label: '400 Bad Request' },
-  { value: 401, label: '401 Unauthorized' },
-  { value: 403, label: '403 Forbidden' },
-  { value: 404, label: '404 Not Found' },
-  { value: 405, label: '405 Method Not Allowed' },
-  { value: 409, label: '409 Conflict' },
-  { value: 422, label: '422 Unprocessable Entity' },
-  { value: 429, label: '429 Too Many Requests' },
-  { value: 500, label: '500 Internal Server Error' },
-  { value: 502, label: '502 Bad Gateway' },
-  { value: 503, label: '503 Service Unavailable' },
-  { value: 504, label: '504 Gateway Timeout' },
+/** 常用 HTTP 状态码（按 1xx/2xx/3xx/4xx/5xx 分组，同 Swagger UI 风格） */
+export const HTTP_STATUS_GROUPS: Array<{ label: string; codes: Array<{ value: number; label: string }> }> = [
+  {
+    label: '1xx · 信息',
+    codes: [
+      { value: 100, label: '100 Continue' },
+      { value: 101, label: '101 Switching Protocols' },
+    ],
+  },
+  {
+    label: '2xx · 成功',
+    codes: [
+      { value: 200, label: '200 OK' },
+      { value: 201, label: '201 Created' },
+      { value: 202, label: '202 Accepted' },
+      { value: 204, label: '204 No Content' },
+    ],
+  },
+  {
+    label: '3xx · 重定向',
+    codes: [
+      { value: 301, label: '301 Moved Permanently' },
+      { value: 302, label: '302 Found' },
+      { value: 304, label: '304 Not Modified' },
+    ],
+  },
+  {
+    label: '4xx · 客户端错误',
+    codes: [
+      { value: 400, label: '400 Bad Request' },
+      { value: 401, label: '401 Unauthorized' },
+      { value: 403, label: '403 Forbidden' },
+      { value: 404, label: '404 Not Found' },
+      { value: 405, label: '405 Method Not Allowed' },
+      { value: 409, label: '409 Conflict' },
+      { value: 422, label: '422 Unprocessable Entity' },
+      { value: 429, label: '429 Too Many Requests' },
+    ],
+  },
+  {
+    label: '5xx · 服务器错误',
+    codes: [
+      { value: 500, label: '500 Internal Server Error' },
+      { value: 502, label: '502 Bad Gateway' },
+      { value: 503, label: '503 Service Unavailable' },
+      { value: 504, label: '504 Gateway Timeout' },
+    ],
+  },
 ];
+
+/** 常用 HTTP 状态码（扁平列表，兼容旧引用） */
+export const HTTP_STATUS_CODES: Array<{ value: number; label: string }> =
+  HTTP_STATUS_GROUPS.flatMap((g) => g.codes);
 
 export const JSON_TEMPLATES: Array<{ key: string; label: string; value: string }> = [
   {

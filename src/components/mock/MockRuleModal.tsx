@@ -109,7 +109,7 @@ export function MockRuleModal({
 
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 80px', columnGap: 10 }}>
           <Form.Item name="responseStatusCode" label="状态码" rules={[{ required: true }]} style={{ marginBottom: 8 }}>
-            <StatusCodeSelect allowCustom style={{ width: '100%' }} />
+            <StatusCodeSelect style={{ width: '100%' }} />
           </Form.Item>
           <Form.Item name="responseDelayMs" label="延迟(ms)" style={{ marginBottom: 8 }}>
             <InputNumber min={0} max={60000} style={{ width: '100%' }} />
