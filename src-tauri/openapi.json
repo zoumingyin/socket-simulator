@@ -1022,9 +1022,6 @@
             "minimum": 0,
             "type": "integer"
           },
-          "startMinimized": {
-            "type": "boolean"
-          },
           "updatedAt": {
             "type": "string"
           },

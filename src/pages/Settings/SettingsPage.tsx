@@ -67,7 +67,6 @@ export function SettingsPage(): React.ReactElement {
             }
           : { whitelist: '', blacklist: '' },
         autoStart: systemSettings.autoStart,
-        startMinimized: systemSettings.startMinimized,
         logRetentionDays: Number(systemSettings.logRetentionDays),
         maxConnectionsPerServer: Number(systemSettings.maxConnectionsPerServer),
       });
@@ -175,14 +174,6 @@ export function SettingsPage(): React.ReactElement {
             label="启动时自动启动服务" 
             valuePropName="checked"
             tooltip="开启后，应用启动时会自动启动所有配置了自动启动的服务"
-          >
-            <Switch />
-          </Form.Item>
-          <Form.Item 
-            name="startMinimized" 
-            label="启动时最小化到托盘" 
-            valuePropName="checked"
-            tooltip="开启后，应用启动时会最小化到系统托盘"
           >
             <Switch />
           </Form.Item>

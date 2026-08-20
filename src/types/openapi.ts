@@ -1060,7 +1060,6 @@ export interface components {
             logRetentionDays?: number;
             /** Format: int64 */
             maxConnectionsPerServer?: number;
-            startMinimized?: boolean;
             updatedAt?: string;
             wss?: components["schemas"]["WssConfig"];
         };

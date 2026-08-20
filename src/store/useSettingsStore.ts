@@ -24,7 +24,6 @@ const defaultSystemSettings: SystemSettings = {
   wss: { enabled: false, certPath: '', keyPath: '' },
   ipAccess: { whitelist: [], blacklist: [] },
   autoStart: false,
-  startMinimized: false,
   logRetentionDays: 7,
   maxConnectionsPerServer: 1000,
   updatedAt: new Date().toISOString(),

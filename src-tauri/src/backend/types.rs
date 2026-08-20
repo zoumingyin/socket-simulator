@@ -511,8 +511,6 @@ pub struct SystemSettings {
     #[serde(default)]
     pub auto_start: bool,
     #[serde(default)]
-    pub start_minimized: bool,
-    #[serde(default)]
     pub log_retention_days: u64,
     #[serde(default)]
     pub max_connections_per_server: u64,

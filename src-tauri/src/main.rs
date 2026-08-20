@@ -140,17 +140,9 @@ fn main() {
             let backend = Backend::new(app.handle().clone());
             app.manage(backend.clone());
 
-            // 根据配置决定是否显示窗口（P2-2：改从 ConfigManager 主读，不再直读 config.json）
-            let start_minimized = backend.config.get_system_settings().start_minimized;
-            println!("[main] startMinimized = {}", start_minimized);
-            if start_minimized {
-                println!("[main] 启动时最小化到托盘");
-                let _ = window.hide();
-                let _ = window.set_skip_taskbar(true);
-            } else {
-                let _ = window.show();
-                let _ = window.set_skip_taskbar(false);
-            }
+            // 启动时总是显示主窗口（v3.0.0：移除「启动最小化到托盘」功能）
+            let _ = window.show();
+            let _ = window.set_skip_taskbar(false);
 
             // 设置托盘
             setup_tray(app)?;

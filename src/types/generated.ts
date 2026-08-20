@@ -72,7 +72,7 @@ export type IpAccessList = { whitelist?: string[]; blacklist?: string[] }/**
 export type WssConfig = { enabled?: boolean; certPath?: string; keyPath?: string }/**
  * 系统设置
  */
-export type SystemSettings = { id?: string; heartbeat?: HeartbeatConfig; wss?: WssConfig; ipAccess?: IpAccessList; autoStart?: boolean; startMinimized?: boolean; logRetentionDays?: number; maxConnectionsPerServer?: number; updatedAt?: string }/**
+export type SystemSettings = { id?: string; heartbeat?: HeartbeatConfig; wss?: WssConfig; ipAccess?: IpAccessList; autoStart?: boolean; logRetentionDays?: number; maxConnectionsPerServer?: number; updatedAt?: string }/**
  * 窗口配置
  */
 export type WindowConfig = { width: number; height: number; x: number | null; y: number | null; maximized: boolean }/**

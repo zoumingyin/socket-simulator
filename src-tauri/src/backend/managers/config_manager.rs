@@ -580,7 +580,7 @@ mod tests {
             cm.save_servers(vec![mk_server("s1", "S1")]);
             cm.save_system_settings(SystemSettings {
                 id: "system".into(),
-                start_minimized: true,
+                auto_start: true,
                 ..Default::default()
             });
             let file = dir.join("config.json");
@@ -597,8 +597,8 @@ mod tests {
         assert_eq!(cm.get_servers().len(), 1, "sqlite 模式应读到已迁移数据");
         assert_eq!(cm.get_server_by_id("s1").unwrap().name, "S1");
         assert!(
-            cm.get_system_settings().start_minimized,
-            "迁移应保留 systemSettings.startMinimized"
+            cm.get_system_settings().auto_start,
+            "迁移应保留 systemSettings.autoStart"
         );
         let _ = std::fs::remove_dir_all(&dir);
     }
