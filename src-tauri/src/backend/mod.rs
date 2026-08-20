@@ -6,6 +6,7 @@
 pub mod api;
 pub mod app;
 pub mod audit;
+pub mod benchmark;
 pub mod constants;
 pub mod error;
 pub mod eventbus;
