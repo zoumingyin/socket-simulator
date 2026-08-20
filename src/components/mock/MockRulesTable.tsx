@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import type { Key } from 'react';
 import { Button, Table, Tag, Space, Popconfirm, message, Switch, Typography } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
 import { EditOutlined, DeleteOutlined, PlusOutlined, FolderOutlined } from '@ant-design/icons';
@@ -18,6 +19,7 @@ export function MockRulesTable({
 }) {
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState<MockRule | null>(null);
+  const [selectedKeys, setSelectedKeys] = useState<Key[]>([]);
 
   const openNew = () => { setEditing(null); setModalOpen(true); };
   const openEdit = (rule: MockRule) => { setEditing(rule); setModalOpen(true); };
@@ -36,8 +38,22 @@ export function MockRulesTable({
     messageApi.success('已删除');
   };
 
+  const handleBatchDelete = async () => {
+    if (selectedKeys.length === 0) return;
+    const ids = new Set(selectedKeys.map(String));
+    await onUpdate(rules.filter((r) => !ids.has(r.id ?? '')));
+    setSelectedKeys([]);
+    messageApi.success(`已删除 ${ids.size} 条规则`);
+  };
+
   const handleToggle = async (rule: MockRule, enabled: boolean) => {
     await onUpdate(rules.map((r) => (r.id === rule.id ? { ...r, enabled } : r)));
+  };
+
+  /** 行选择（跨分组共享选中态） */
+  const rowSelection = {
+    selectedRowKeys: selectedKeys,
+    onChange: (keys: Key[]) => setSelectedKeys(keys),
   };
 
   /** 按 group（Swagger tags）分组：有分组按组排列，无分组归「未分组」放最后 */
@@ -102,6 +118,7 @@ export function MockRulesTable({
         rowKey="id"
         columns={columns}
         dataSource={list}
+        rowSelection={rowSelection}
         pagination={list.length > 8 ? { pageSize: 8, size: 'small' } : false}
         size="small"
         tableLayout="fixed"
@@ -112,8 +129,21 @@ export function MockRulesTable({
 
   return (
     <div style={{ width: '100%', maxWidth: '100%', minWidth: 0, overflow: 'hidden' }}>
-      <div style={{ marginBottom: 10 }}>
+      <div style={{ marginBottom: 10, display: 'flex', gap: 8, alignItems: 'center' }}>
         <Button type="primary" icon={<PlusOutlined />} onClick={openNew}>新增规则</Button>
+        <Popconfirm
+          title={`确认删除选中的 ${selectedKeys.length} 条规则？`}
+          onConfirm={handleBatchDelete}
+          disabled={selectedKeys.length === 0}
+        >
+          <Button
+            danger
+            icon={<DeleteOutlined />}
+            disabled={selectedKeys.length === 0}
+          >
+            批量删除{selectedKeys.length > 0 ? ` (${selectedKeys.length})` : ''}
+          </Button>
+        </Popconfirm>
       </div>
       {rules.length === 0 ? (
         <Table
