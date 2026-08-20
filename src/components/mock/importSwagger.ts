@@ -9,8 +9,9 @@
  * 转换规则：
  * - path 参数 `{id}` → mock 规则路径参数 `:id`
  * - 响应状态码：优先首个 2xx（含 `2XX` 通配），否则首个 3 位数字，兜底 200
- * - 响应体：取 response 的 `example` → `schema`（递归生成示例值，支持 `$ref`
- *   引用 components.schemas / definitions，循环引用有防护）→ 兜底 `{}`
+ * - 响应体（默认值优先级）：响应 `example` → `examples`（复数，取首个 value）→
+ *   `schema` 递归示例（支持 `$ref` 引用 components.schemas / definitions，
+ *   循环引用有防护）→ 兜底 `{}`
  * - 规则名：operationId → summary → `{METHOD} {path}`
  */
 
@@ -124,12 +125,22 @@ function pickResponse(responses: unknown, ctx: SchemaRefContext): { status: numb
 
   const r = resp as Record<string, unknown>;
   let body = '{}';
-  // OpenAPI 3.x：responses[].content['application/json']
+  // OpenAPI 3.x：responses[].content['application/json']（example/examples/schema）
   const content = r.content as Record<string, unknown> | undefined;
   if (content && typeof content === 'object') {
     const json = content['application/json'] as Record<string, unknown> | undefined;
     if (json && typeof json === 'object') {
       body = bodyFromExampleOrSchema(json, ctx);
+    }
+  }
+  // Swagger 2.0：responses[].examples['application/json'] 直接作为响应体
+  if (body === '{}') {
+    const ex = r.examples as Record<string, unknown> | undefined;
+    if (ex && typeof ex === 'object') {
+      const v = ex['application/json'] ?? Object.values(ex)[0];
+      if (v !== undefined) {
+        body = typeof v === 'string' ? v : JSON.stringify(v, null, 2);
+      }
     }
   }
   // Swagger 2.0：responses[].schema
@@ -140,9 +151,21 @@ function pickResponse(responses: unknown, ctx: SchemaRefContext): { status: numb
 }
 
 function bodyFromExampleOrSchema(json: Record<string, unknown>, ctx: SchemaRefContext): string {
+  // OpenAPI 3.x：example（单数）优先作为默认值
   const example = (json as Record<string, unknown>).example;
   if (example !== undefined) {
     return typeof example === 'string' ? example : JSON.stringify(example, null, 2);
+  }
+  // OpenAPI 3.x：examples（复数，Map<name, ExampleObject>）取首个 value
+  const examples = json.examples as Record<string, unknown> | undefined;
+  if (examples && typeof examples === 'object') {
+    const first = Object.values(examples)[0];
+    if (first && typeof first === 'object') {
+      const v = (first as Record<string, unknown>).value;
+      if (v !== undefined) {
+        return typeof v === 'string' ? v : JSON.stringify(v, null, 2);
+      }
+    }
   }
   const schema = json.schema as Record<string, unknown> | undefined;
   if (schema && typeof schema === 'object') {
