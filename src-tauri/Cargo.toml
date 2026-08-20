@@ -7,7 +7,10 @@ description = "Socket 服务管理平台"
 default-run = "socket-service-manager"
 
 [lib]
-name = "socket_service_manager"
+# 与 bin `socket-service-manager` 区分：rustc 将 bin 的 Windows PDB 调试符号
+# 规范化为 `socket_service_manager.pdb`，与 lib 同名导致 output filename collision 警告。
+# lib 未被任何代码引用（main.rs 自包含 `mod backend;`），改名无副作用。
+name = "socket_service_manager_lib"
 crate-type = ["cdylib", "staticlib", "rlib"]
 
 [dependencies]
