@@ -21,6 +21,9 @@ pub enum BackendError {
 
     #[error("io error: {0}")]
     Io(String),
+
+    #[error("not implemented: {0}")]
+    NotImplemented(String),
 }
 
 impl BackendError {
@@ -32,6 +35,7 @@ impl BackendError {
             BackendError::Internal(_) => "INTERNAL_ERROR",
             BackendError::Config(_) => "CONFIG_ERROR",
             BackendError::Io(_) => "INTERNAL_ERROR",
+            BackendError::NotImplemented(_) => "NOT_IMPLEMENTED",
         }
     }
 
@@ -42,7 +46,13 @@ impl BackendError {
             BackendError::TransportNotFound => 400,
             BackendError::Config(_) => 400,
             BackendError::Internal(_) | BackendError::Io(_) => 500,
+            BackendError::NotImplemented(_) => 501,
         }
+    }
+
+    /// 构造 `NotImplemented` 错误（预留协议 / 未实现功能的统一报错入口）
+    pub fn not_implemented(msg: impl Into<String>) -> Self {
+        BackendError::NotImplemented(msg.into())
     }
 }
 

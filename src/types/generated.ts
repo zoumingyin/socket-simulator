@@ -4,7 +4,7 @@
 /**
  * 协议类型
  */
-export type ProtocolType = "websocket" | "socket.io" | "http"/**
+export type ProtocolType = "websocket" | "socket.io" | "http" | "tcp" | "udp" | "mqtt" | "sse"/**
  * HTTP 方法（受管 HTTP 服务的自定义路由可指定）
  */
 export type HttpMethod = "GET" | "POST" | "PUT" | "DELETE" | "PATCH" | "HEAD" | "OPTIONS" | "ANY"/**

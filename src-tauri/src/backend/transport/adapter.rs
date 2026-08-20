@@ -43,6 +43,14 @@ pub enum AdapterKind {
     Http,
     /// 共端口模式（Mock HTTP + Socket 同一端口，对应 UnifiedServer）
     Unified,
+    /// 预留协议（P2-4 骨架，尚未实现）
+    Tcp,
+    /// 预留协议（P2-4 骨架，尚未实现）
+    Udp,
+    /// 预留协议（P2-4 骨架，尚未实现）
+    Mqtt,
+    /// 预留协议（P2-4 骨架，尚未实现）
+    Sse,
 }
 
 impl AdapterKind {
@@ -60,6 +68,10 @@ impl AdapterKind {
             ProtocolType::Websocket => AdapterKind::Websocket,
             ProtocolType::SocketIo => AdapterKind::SocketIo,
             ProtocolType::Http => AdapterKind::Http,
+            ProtocolType::Tcp => AdapterKind::Tcp,
+            ProtocolType::Udp => AdapterKind::Udp,
+            ProtocolType::Mqtt => AdapterKind::Mqtt,
+            ProtocolType::Sse => AdapterKind::Sse,
         }
     }
 
@@ -69,6 +81,10 @@ impl AdapterKind {
             AdapterKind::SocketIo => "socketio",
             AdapterKind::Http => "http",
             AdapterKind::Unified => "unified",
+            AdapterKind::Tcp => "tcp",
+            AdapterKind::Udp => "udp",
+            AdapterKind::Mqtt => "mqtt",
+            AdapterKind::Sse => "sse",
         }
     }
 }
@@ -95,7 +111,11 @@ impl AdapterRegistry {
 
     fn register_builtin(&self) {
         use crate::backend::transport::http::HttpServer;
+        use crate::backend::transport::mqtt::MqttAdapter;
+        use crate::backend::transport::sse::SseAdapter;
         use crate::backend::transport::socketio::SocketIoServer;
+        use crate::backend::transport::tcp::TcpAdapter;
+        use crate::backend::transport::udp::UdpAdapter;
         use crate::backend::transport::unified::UnifiedServer;
         use crate::backend::transport::websocket::WsServer;
 
@@ -116,6 +136,19 @@ impl AdapterRegistry {
         self.register(AdapterKind::Unified, Arc::new(|cfg, sys, hooks| {
             let unified = Arc::new(UnifiedServer::new(cfg, sys, hooks));
             unified as Arc<dyn ProtocolAdapter>
+        }));
+        // 预留协议（P2-4 骨架）：注册工厂，start() 返回 NotImplemented，尚未实现
+        self.register(AdapterKind::Tcp, Arc::new(|cfg, sys, hooks| {
+            TcpAdapter::new(cfg, sys, hooks) as Arc<dyn ProtocolAdapter>
+        }));
+        self.register(AdapterKind::Udp, Arc::new(|cfg, sys, hooks| {
+            UdpAdapter::new(cfg, sys, hooks) as Arc<dyn ProtocolAdapter>
+        }));
+        self.register(AdapterKind::Mqtt, Arc::new(|cfg, sys, hooks| {
+            MqttAdapter::new(cfg, sys, hooks) as Arc<dyn ProtocolAdapter>
+        }));
+        self.register(AdapterKind::Sse, Arc::new(|cfg, sys, hooks| {
+            SseAdapter::new(cfg, sys, hooks) as Arc<dyn ProtocolAdapter>
         }));
     }
 
@@ -151,6 +184,7 @@ impl Default for AdapterRegistry {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::backend::error::BackendError;
     use crate::backend::types::ClientInfo;
 
     fn noop_hooks() -> TransportHooks {
@@ -172,15 +206,60 @@ mod tests {
     #[test]
     fn builtin_kinds_are_registered() {
         let reg = AdapterRegistry::new();
-        assert_eq!(reg.kinds().len(), 4);
+        assert_eq!(reg.kinds().len(), 8);
         for k in [
             AdapterKind::Websocket,
             AdapterKind::SocketIo,
             AdapterKind::Http,
             AdapterKind::Unified,
+            AdapterKind::Tcp,
+            AdapterKind::Udp,
+            AdapterKind::Mqtt,
+            AdapterKind::Sse,
         ] {
             assert!(reg.kinds().contains(&k), "{} 应已注册", k.as_str());
         }
+    }
+
+    #[test]
+    fn reserved_kinds_are_registered() {
+        let reg = AdapterRegistry::new();
+        let cases = [
+            (AdapterKind::Tcp, ProtocolType::Tcp),
+            (AdapterKind::Udp, ProtocolType::Udp),
+            (AdapterKind::Mqtt, ProtocolType::Mqtt),
+            (AdapterKind::Sse, ProtocolType::Sse),
+        ];
+        for (kind, proto) in cases {
+            assert!(reg.kinds().contains(&kind), "{} 应已注册", kind.as_str());
+            let a = reg
+                .create(kind, sample_cfg(proto), SystemSettings::default(), noop_hooks())
+                .expect("reserved adapter 应可创建");
+            assert_eq!(a.protocol(), proto);
+            assert_eq!(a.server_id(), "s1");
+            assert!(!a.is_unified());
+        }
+    }
+
+    #[test]
+    fn reserved_adapter_start_returns_not_implemented() {
+        let rt = tokio::runtime::Runtime::new().unwrap();
+        rt.block_on(async {
+            let reg = AdapterRegistry::new();
+            let a = reg
+                .create(
+                    AdapterKind::Tcp,
+                    sample_cfg(ProtocolType::Tcp),
+                    SystemSettings::default(),
+                    noop_hooks(),
+                )
+                .expect("tcp adapter 应可创建");
+            let err = a
+                .start()
+                .await
+                .expect_err("reserved adapter start 应返回 NotImplemented");
+            assert!(matches!(err, BackendError::NotImplemented(_)));
+        });
     }
 
     #[test]

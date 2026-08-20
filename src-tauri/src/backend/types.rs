@@ -17,6 +17,18 @@ pub enum ProtocolType {
     SocketIo,
     #[serde(rename = "http")]
     Http,
+    /// 预留协议（P2-4 骨架，尚未实现）
+    #[serde(rename = "tcp")]
+    Tcp,
+    /// 预留协议（P2-4 骨架，尚未实现）
+    #[serde(rename = "udp")]
+    Udp,
+    /// 预留协议（P2-4 骨架，尚未实现）
+    #[serde(rename = "mqtt")]
+    Mqtt,
+    /// 预留协议（P2-4 骨架，尚未实现）
+    #[serde(rename = "sse")]
+    Sse,
 }
 
 /// HTTP 方法（受管 HTTP 服务的自定义路由可指定）
