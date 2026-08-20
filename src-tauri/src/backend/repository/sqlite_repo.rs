@@ -9,7 +9,8 @@
 //! - `meta(key PK, value TEXT)`         —— version / exported_at
 //!
 //! `save_config` 为全量覆盖：事务内 DELETE + 逐条 INSERT OR REPLACE。
-//! `migrate_from_json` 仅在 SQLite 为空时从旧 `config.json` 一次性导入（幂等）。
+//! `migrate_from_json` 在 SQLite 为空 **或** 旧 `config.json` 的 `exported_at` 晚于 SQLite
+//! 当前 `exported_at` 时，从旧 `config.json` 全量导入（幂等；补全 P2-1 灰度期镜像写失败导致的 SQLite 落后）。
 
 use std::path::Path;
 
@@ -207,22 +208,33 @@ impl Repository for SqliteRepository {
     }
 
     async fn migrate_from_json(&self, json_path: &Path) -> Result<(), BackendError> {
-        // 仅当 servers 表为空（未迁移过）时导入，幂等
+        // SQLite 当前 servers 数量（空库 = 未迁移过）
         let count: i64 = sqlx::query("SELECT COUNT(*) AS c FROM servers")
             .fetch_one(&self.pool)
             .await
             .map_err(to_err)?
             .get("c");
-        if count > 0 {
-            return Ok(());
-        }
-        match std::fs::read_to_string(json_path) {
+
+        // 读取旧 config.json（无文件/损坏 → 跳过，保持现状语义）
+        let json_cfg = match std::fs::read_to_string(json_path) {
             Ok(s) => match serde_json::from_str::<PersistedConfig>(&s) {
-                Ok(cfg) => self.save_config(&cfg).await,
-                Err(_) => Ok(()), // 损坏的 JSON：跳过迁移，保持空库
+                Ok(cfg) => cfg,
+                Err(_) => return Ok(()), // 损坏的 JSON：跳过迁移
             },
-            Err(_) => Ok(()), // 无旧文件：无需迁移
+            Err(_) => return Ok(()), // 无旧文件：无需迁移
+        };
+
+        // SQLite 当前 exported_at（无则空串）
+        let db_exported = get_meta(&self.pool, "exported_at")
+            .await?
+            .unwrap_or_default();
+
+        // 空库 或 JSON 比 SQLite 更新 → 全量覆盖导入（补全灰度期镜像落后，无数据丢失）
+        let should_import = count == 0 || json_cfg.exported_at > db_exported;
+        if !should_import {
+            return Ok(()); // SQLite 数据更新/相同，不覆盖（无数据丢失）
         }
+        self.save_config(&json_cfg).await
     }
 }
 
@@ -369,5 +381,91 @@ mod tests {
             1,
             "迁移应幂等：重复迁移不应重复导入（仍为 1 条）"
         );
+    }
+
+    /// 更新的 JSON 应覆盖「过时的 SQLite」（exported_at 比较）
+    #[tokio::test]
+    async fn migrate_overrides_stale_db_when_json_is_newer() {
+        let dir = std::env::temp_dir().join(format!("ssm_mig_newer_{}", uuid::Uuid::new_v4()));
+        let _ = std::fs::create_dir_all(&dir);
+        let db = dir.join("data.db");
+
+        // 先写入一个「旧」SQLite（exported_at 较早）
+        let mut old = sample_config();
+        old.exported_at = "2020-01-01T00:00:00Z".into();
+        old.servers = vec![ServerConfig {
+            id: "stale".into(),
+            name: "Stale".into(),
+            port: 3000,
+            protocol: ProtocolType::Websocket,
+            ..Default::default()
+        }];
+        {
+            let repo = SqliteRepository::open(&db).await.unwrap();
+            repo.init().await.unwrap();
+            repo.save_config(&old).await.unwrap();
+        }
+
+        // 造一个 exported_at 更新的 config.json
+        let mut newer = sample_config();
+        newer.exported_at = "2099-01-01T00:00:00Z".into();
+        newer.servers = vec![ServerConfig {
+            id: "fresh".into(),
+            name: "Fresh".into(),
+            port: 3000,
+            protocol: ProtocolType::Websocket,
+            ..Default::default()
+        }];
+        let json_path = dir.join("config.json");
+        std::fs::write(&json_path, serde_json::to_string(&newer).unwrap()).unwrap();
+
+        let repo = SqliteRepository::open(&db).await.unwrap();
+        repo.migrate_from_json(&json_path).await.unwrap();
+        let loaded = repo.load_config().await.unwrap();
+        assert_eq!(loaded.servers.len(), 1, "应被更新的 JSON 覆盖");
+        assert_eq!(loaded.servers[0].id, "fresh");
+    }
+
+    /// 较旧的 JSON 不应覆盖「更新的 SQLite」（无数据丢失反向验证）
+    #[tokio::test]
+    async fn migrate_keeps_newer_db_when_json_is_stale() {
+        let dir = std::env::temp_dir().join(format!("ssm_mig_older_{}", uuid::Uuid::new_v4()));
+        let _ = std::fs::create_dir_all(&dir);
+        let db = dir.join("data.db");
+
+        // 先写入一个「新」SQLite（exported_at 较晚）
+        let mut fresh = sample_config();
+        fresh.exported_at = "2099-01-01T00:00:00Z".into();
+        fresh.servers = vec![ServerConfig {
+            id: "keep".into(),
+            name: "Keep".into(),
+            port: 3000,
+            protocol: ProtocolType::Websocket,
+            ..Default::default()
+        }];
+        {
+            let repo = SqliteRepository::open(&db).await.unwrap();
+            repo.init().await.unwrap();
+            repo.save_config(&fresh).await.unwrap();
+        }
+
+        // 造一个 exported_at 更旧的 config.json
+        let mut stale = sample_config();
+        stale.exported_at = "2020-01-01T00:00:00Z".into();
+        stale.servers = vec![ServerConfig {
+            id: "stale".into(),
+            name: "Stale".into(),
+            port: 3000,
+            protocol: ProtocolType::Websocket,
+            ..Default::default()
+        }];
+        let json_path = dir.join("config.json");
+        std::fs::write(&json_path, serde_json::to_string(&stale).unwrap()).unwrap();
+
+        let repo = SqliteRepository::open(&db).await.unwrap();
+        repo.migrate_from_json(&json_path).await.unwrap();
+        let loaded = repo.load_config().await.unwrap();
+        assert_eq!(loaded.servers.len(), 1, "不应被旧 JSON 覆盖（无数据丢失）");
+        assert_eq!(loaded.servers[0].id, "keep");
     }
 }

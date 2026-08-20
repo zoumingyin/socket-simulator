@@ -3,10 +3,6 @@
 
 mod backend;
 
-use std::fs::File;
-use std::io::Read;
-
-use serde_json::Value;
 use tauri::{
     AppHandle, Emitter, Manager, Runtime,
     menu::{Menu, MenuItem, PredefinedMenuItem},
@@ -23,28 +19,6 @@ const MENU_START_ALL: &str = "start_all";
 const MENU_STOP_ALL: &str = "stop_all";
 const MENU_RESTART_ALL: &str = "restart_all";
 const MENU_QUIT: &str = "quit";
-
-/// 从 app_data_dir 下的 config/config.json 读取 startMinimized 配置
-fn should_start_minimized(app: &AppHandle) -> bool {
-    let dir = match app.path().app_data_dir() {
-        Ok(d) => d,
-        Err(_) => return false,
-    };
-    let path = dir.join("config").join("config.json");
-    if let Ok(mut file) = File::open(path) {
-        let mut contents = String::new();
-        if file.read_to_string(&mut contents).is_ok() {
-            if let Ok(json) = serde_json::from_str::<Value>(&contents) {
-                if let Some(system) = json.get("systemSettings") {
-                    if let Some(minimized) = system.get("startMinimized") {
-                        return minimized.as_bool().unwrap_or(false);
-                    }
-                }
-            }
-        }
-    }
-    false
-}
 
 /// 显示主窗口
 fn show_main_window<R: Runtime>(app: &AppHandle<R>) {
@@ -162,8 +136,12 @@ fn main() {
                 let _ = window.set_icon(icon.clone());
             }
 
-            // 根据配置决定是否显示窗口
-            let start_minimized = should_start_minimized(app.handle());
+            // ===== 启动 Rust 后端（先初始化，确保配置已从 SQLite 主读） =====
+            let backend = Backend::new(app.handle().clone());
+            app.manage(backend.clone());
+
+            // 根据配置决定是否显示窗口（P2-2：改从 ConfigManager 主读，不再直读 config.json）
+            let start_minimized = backend.config.get_system_settings().start_minimized;
             println!("[main] startMinimized = {}", start_minimized);
             if start_minimized {
                 println!("[main] 启动时最小化到托盘");
@@ -177,9 +155,7 @@ fn main() {
             // 设置托盘
             setup_tray(app)?;
 
-            // ===== 启动 Rust 后端（集成进 Tauri，不再需要 Node sidecar） =====
-            let backend = Backend::new(app.handle().clone());
-            app.manage(backend.clone());
+            // 启动后端异步任务
             tauri::async_runtime::spawn(run_backend(backend));
 
             Ok(())

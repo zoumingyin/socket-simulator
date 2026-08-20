@@ -1,13 +1,14 @@
-//! ConfigManager —— 配置持久化管理（v3 P0-1：存储后端可插拔；P2-1：双轨并行）
+//! ConfigManager —— 配置持久化管理（v3 P0-1：存储后端可插拔；P2-2：去 JSON 直读）
 //!
-//! 持有 `Arc<dyn Repository>`，默认 `JsonRepository`（单 config.json，行为兼容旧版）。
+//! 持有 `Arc<dyn Repository>`，**主读 SQLite（`config.db`）**（`SqliteRepository`）。
 //! 对外同步 API（`get_*` / `save_*` / `init` / `new`）保持不变，所有 REST/WS handler 零改动。
 //!
-//! ## 存储模式（P2-1 双轨并行，env `SSM_REPOSITORY` 控制，可回退）
-//! - `dual`（默认）：**读 JSON（主） + JSON/SQLite 双写**。灰度期：JSON 仍是权威读源，
-//!   每次落盘同时镜像写 `config.db`（SQLite），SQLite 数据持续与 JSON 对齐；
-//! - `sqlite`：主读 SQLite（P2-2 去 JSON 的目标态），首次空库自动从旧 config.json 迁移；
-//! - `json`：纯 JSON（关闭双写，完全回退旧行为）。
+//! ## 存储模式（env `SSM_REPOSITORY` 控制）
+//! - `sqlite`（默认）：主读 SQLite（P2-2 目标态），首次空库自动从旧 `config.json` 迁移；
+//!   SQLite 打开失败时强告警并紧急回退 `JsonRepository`（避免「数据看起来丢失」）。
+//! - `json`：纯 JSON（逃生门，完全回退旧行为），仅用于紧急排障。
+//!
+//! `config.json` 仅作为「一次性迁移源」：空 SQLite 首次运行时导入，之后不再被主读/主写。
 //!
 //! 内存中维护 `PersistedConfig` 权威副本，单写者 `mpsc` channel 串行化落盘；
 //! 合并写（dirty 标记）保证高频写不丢、无堆积。
@@ -61,8 +62,6 @@ pub struct ConfigManager {
     writer_tx: mpsc::Sender<WriteOp>,
     /// 可替换的存储后端（主读写源）
     repo: Arc<dyn Repository>,
-    /// 镜像存储（dual 双轨：写 JSON 时同步写 SQLite）
-    mirror: Option<Arc<dyn Repository>>,
     /// 合并写标记：存在未落盘的最新内存修改（背压兜底，替代静默丢弃）
     dirty: Arc<AtomicBool>,
     /// 飞行中的写信号：保证 channel 内最多 1 个 `Persist`，避免堆积
@@ -70,45 +69,32 @@ pub struct ConfigManager {
 }
 
 impl ConfigManager {
-    /// 存储模式：env `SSM_REPOSITORY`（json | sqlite | dual，默认 dual）
+    /// 存储模式：env `SSM_REPOSITORY`（json | sqlite，默认 sqlite）
     fn repo_mode() -> String {
-        std::env::var("SSM_REPOSITORY").unwrap_or_else(|_| "dual".to_string())
+        std::env::var("SSM_REPOSITORY").unwrap_or_else(|_| "sqlite".to_string())
     }
 
     /// 构建主 repo（按模式；sqlite 用独立 runtime 驱动异步 open）
     fn build_repo(mode: &str, config_file: &PathBuf, config_dir: &PathBuf) -> Arc<dyn Repository> {
         match mode {
-            "sqlite" => {
+            "json" => Arc::new(JsonRepository::new(config_file.clone())),
+            _ => {
+                // 默认 sqlite：主读 SQLite（P2-2 目标态）；打开失败强告警 + JSON 兜底
                 let db_path = config_dir.join("config.db");
-                let repo = block_on_async(async move {
-                    SqliteRepository::open(&db_path).await
-                });
+                let repo = block_on_async(async move { SqliteRepository::open(&db_path).await });
                 match repo {
                     Ok(r) => Arc::new(r),
                     Err(e) => {
-                        eprintln!("[ConfigManager] 打开 config.db 失败，回退 JSON: {}", e);
+                        eprintln!(
+                            "[ConfigManager][紧急] config.db 打开失败，已回退 JSON 读取！\n  \
+                             原因: {}\n  \
+                             数据仍可从 config.json 读取，但 SQLite 主读不可用，请尽快检查磁盘/权限。",
+                            e
+                        );
                         Arc::new(JsonRepository::new(config_file.clone()))
                     }
                 }
             }
-            _ => Arc::new(JsonRepository::new(config_file.clone())),
-        }
-    }
-
-    /// 镜像 repo（仅 dual：SQLite 镜像）
-    fn build_mirror(mode: &str, config_dir: &PathBuf) -> Option<Arc<dyn Repository>> {
-        if mode == "dual" {
-            let db_path = config_dir.join("config.db");
-            let repo = block_on_async(async move { SqliteRepository::open(&db_path).await });
-            match repo {
-                Ok(r) => Some(Arc::new(r)),
-                Err(e) => {
-                    eprintln!("[ConfigManager] SQLite 镜像初始化失败（继续 JSON 单写）: {}", e);
-                    None
-                }
-            }
-        } else {
-            None
         }
     }
 
@@ -116,12 +102,11 @@ impl ConfigManager {
         Self::with_mode(config_dir, &Self::repo_mode())
     }
 
-    /// 指定存储模式构造（测试/程序化控制；`mode`: json | sqlite | dual）
+    /// 指定存储模式构造（测试/程序化控制；`mode`: json | sqlite）
     pub fn with_mode(config_dir: PathBuf, mode: &str) -> Self {
         let config_file = config_dir.join("config.json");
-        // P2-1：dual（默认）读 JSON + 双写；sqlite 主读 SQLite；json 纯 JSON 回退
+        // P2-2：sqlite（默认）主读 SQLite；json 纯 JSON 回退（逃生门）
         let repo = Self::build_repo(mode, &config_file, &config_dir);
-        let mirror = Self::build_mirror(mode, &config_dir);
         let data = Arc::new(Mutex::new(PersistedConfig::default()));
         let dirty = Arc::new(AtomicBool::new(false));
         let in_flight = Arc::new(AtomicBool::new(false));
@@ -130,7 +115,6 @@ impl ConfigManager {
         // 单写者后台任务：串行落盘；合并写（dirty 标记）保证高频写不丢、无堆积
         let data_clone = data.clone();
         let repo_clone = repo.clone();
-        let mirror_clone = mirror.clone();
         let dirty_clone = dirty.clone();
         let in_flight_clone = in_flight.clone();
         tauri::async_runtime::spawn(async move {
@@ -141,11 +125,6 @@ impl ConfigManager {
                     let snapshot = { data_clone.lock().unwrap().clone() };
                     if let Err(e) = repo_clone.save_config(&snapshot).await {
                         eprintln!("[ConfigManager] 持久化失败: {}", e);
-                    }
-                    if let Some(m) = &mirror_clone {
-                        if let Err(e) = m.save_config(&snapshot).await {
-                            eprintln!("[ConfigManager] SQLite 镜像写失败: {}", e);
-                        }
                     }
                     if !dirty_clone.swap(false, Ordering::SeqCst) {
                         break;
@@ -161,7 +140,6 @@ impl ConfigManager {
             data,
             writer_tx,
             repo,
-            mirror,
             dirty,
             in_flight,
         }
@@ -199,16 +177,7 @@ impl ConfigManager {
             }
         }
 
-        // dual：SQLite 镜像初始化（建表 + 空库时从 JSON 导入），保证镜像与主源对齐
-        if let Some(m) = &self.mirror {
-            let config_file = self.config_file.clone();
-            let m = m.clone();
-            let _ = block_on_async(async move {
-                m.init().await?;
-                m.migrate_from_json(&config_file).await
-            });
-        }
-
+        // P2-2：不再有 dual 镜像。SQLite 已在上面 init+迁移+载入；内存权威副本已就绪。
         self.request_persist();
     }
 
@@ -481,7 +450,8 @@ mod tests {
         let dir = tmp_config_dir();
         let servers = vec![mk_server("a", "A"), mk_server("b", "B")];
         {
-            let cm = ConfigManager::new(dir.clone());
+            // 显式 json 模式，保留「JSON 落盘」语义（P2-2 默认已切 sqlite）
+            let cm = ConfigManager::with_mode(dir.clone(), "json");
             cm.init();
             cm.save_servers(servers);
         }
@@ -501,8 +471,8 @@ mod tests {
             }
             std::thread::sleep(std::time::Duration::from_millis(10));
         }
-        assert!(written, "config.json should persist 2 servers to temp file");
-        let cm2 = ConfigManager::new(dir.clone());
+        assert!(written, "config.json should persist 2 servers to temp file (json mode)");
+        let cm2 = ConfigManager::with_mode(dir.clone(), "json");
         cm2.init();
         let reloaded = cm2.get_servers();
         assert_eq!(reloaded.len(), 2);
@@ -546,7 +516,7 @@ mod tests {
     fn rapid_writes_coalesce_to_latest() {
         // F-5：高频连续写应合并为最新状态落盘，不应因通道满而静默丢弃
         let dir = tmp_config_dir();
-        let cm = ConfigManager::new(dir.clone());
+        let cm = ConfigManager::with_mode(dir.clone(), "json");
         cm.init();
         for i in 0..200 {
             cm.save_servers(vec![mk_server(&format!("s{}", i), &format!("N{}", i))]);
@@ -568,28 +538,26 @@ mod tests {
             }
             std::thread::sleep(std::time::Duration::from_millis(10));
         }
-        assert!(ok, "高频写应合并为最新状态落盘（s199）");
+        assert!(ok, "高频写应合并为最新状态落盘（s199，json 模式）");
     }
 
-    // ==================== P2-1 双轨并行 ====================
+    // ==================== P2-2 去 JSON 直读 ====================
 
-    /// dual：写 JSON 的同时镜像写 SQLite，两边数据一致
+    /// 默认模式（不设 env）应为 sqlite：数据落 config.db 且可主读
     #[tokio::test]
-    async fn dual_mode_mirrors_json_to_sqlite() {
+    async fn default_mode_is_sqlite() {
         let dir = tmp_config_dir();
-        let cm = ConfigManager::with_mode(dir.clone(), "dual");
+        let cm = ConfigManager::new(dir.clone());
         cm.init();
         cm.save_servers(vec![mk_server("a", "A")]);
-
-        // 等 writer task 落盘（JSON + SQLite 镜像）
-        let db_path = dir.join("config.db");
+        let db = dir.join("config.db");
         let mut ok = false;
         for _ in 0..100 {
             std::thread::sleep(std::time::Duration::from_millis(30));
-            if db_path.exists() {
-                if let Ok(repo) = SqliteRepository::open(&db_path).await {
+            if db.exists() {
+                if let Ok(repo) = SqliteRepository::open(&db).await {
                     if let Ok(cfg) = repo.load_config().await {
-                        if cfg.servers.len() == 1 {
+                        if cfg.servers.iter().any(|s| s.id == "a") {
                             ok = true;
                             break;
                         }
@@ -597,19 +565,24 @@ mod tests {
                 }
             }
         }
-        assert!(ok, "dual 模式应镜像写 SQLite（servers=1）");
-        assert!(dir.join("config.json").exists(), "JSON 主源应同时落盘");
+        assert!(ok, "默认 sqlite 模式应落库 config.db 且读到数据");
+        let _ = std::fs::remove_dir_all(&dir);
     }
 
-    /// sqlite 主读：先 dual 写一份，切 sqlite 模式可读到已迁移数据（可回退双向验证）
+    /// 旧配置全量迁移：json 模式写入（模拟旧版 config.json）→ sqlite 模式 init 读到全部数据
     #[tokio::test]
     async fn sqlite_mode_reads_migrated_data() {
         let dir = tmp_config_dir();
-        // 先用 dual 写入（JSON + SQLite 都有）
+        // 用 json 模式写入（模拟旧版 config.json 落盘）
         {
-            let cm = ConfigManager::with_mode(dir.clone(), "dual");
+            let cm = ConfigManager::with_mode(dir.clone(), "json");
             cm.init();
             cm.save_servers(vec![mk_server("s1", "S1")]);
+            cm.save_system_settings(SystemSettings {
+                id: "system".into(),
+                start_minimized: true,
+                ..Default::default()
+            });
             let file = dir.join("config.json");
             for _ in 0..100 {
                 if file.exists() {
@@ -618,15 +591,107 @@ mod tests {
                 std::thread::sleep(std::time::Duration::from_millis(30));
             }
         }
-        // 切 sqlite 主读：init 从 SQLite 加载（空库才迁移，已有数据直接读）
+        // 切 sqlite 主读：init 从旧 config.json 迁移（空库导入）
         let cm = ConfigManager::with_mode(dir.clone(), "sqlite");
         cm.init();
-        assert_eq!(cm.get_servers().len(), 1, "sqlite 模式应读到已落库数据");
+        assert_eq!(cm.get_servers().len(), 1, "sqlite 模式应读到已迁移数据");
         assert_eq!(cm.get_server_by_id("s1").unwrap().name, "S1");
+        assert!(
+            cm.get_system_settings().start_minimized,
+            "迁移应保留 systemSettings.startMinimized"
+        );
         let _ = std::fs::remove_dir_all(&dir);
     }
 
-    /// json 模式：纯 JSON，不创建 SQLite 镜像（完全回退旧行为）
+    /// JSON 比 SQLite 新（exported_at 比较）→ 全量覆盖导入，补全灰度期镜像落后
+    #[tokio::test]
+    async fn sqlite_migrate_overrides_stale_db() {
+        let dir = tmp_config_dir();
+        // 1) sqlite 模式先写「旧数据」
+        {
+            let cm = ConfigManager::with_mode(dir.clone(), "sqlite");
+            cm.init();
+            cm.save_servers(vec![mk_server("old", "Old")]);
+            let db = dir.join("config.db");
+            for _ in 0..100 {
+                std::thread::sleep(std::time::Duration::from_millis(30));
+                if db.exists() {
+                    if let Ok(repo) = SqliteRepository::open(&db).await {
+                        if let Ok(cfg) = repo.load_config().await {
+                            if cfg.servers.iter().any(|s| s.id == "old") {
+                                break;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        // 2) 造一个 exported_at 更新的 config.json（模拟「更新的旧配置」）
+        let json = r#"{
+            "servers": [{"id":"new","name":"New","port":3000,"protocol":"websocket"}],
+            "events": [],
+            "mockServices": [],
+            "scenes": [],
+            "systemSettings": {"id":"system"},
+            "windowConfig": {},
+            "version": "2.0.0",
+            "exportedAt": "2099-01-01T00:00:00Z"
+        }"#;
+        std::fs::write(dir.join("config.json"), json).unwrap();
+        // 3) 再次 sqlite 模式 init：JSON 比 SQLite 新 → 全量覆盖
+        let cm = ConfigManager::with_mode(dir.clone(), "sqlite");
+        cm.init();
+        let loaded = cm.get_servers();
+        assert_eq!(loaded.len(), 1, "应被更新的 JSON 覆盖");
+        assert_eq!(loaded[0].id, "new");
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    /// SQLite 比 JSON 新（exported_at 比较）→ 不覆盖，验证「无数据丢失」反向
+    #[tokio::test]
+    async fn sqlite_keeps_newer_db() {
+        let dir = tmp_config_dir();
+        // 1) sqlite 模式写入数据（exported_at 为当前时间，较晚）
+        {
+            let cm = ConfigManager::with_mode(dir.clone(), "sqlite");
+            cm.init();
+            cm.save_servers(vec![mk_server("fresh", "Fresh")]);
+            let db = dir.join("config.db");
+            for _ in 0..100 {
+                std::thread::sleep(std::time::Duration::from_millis(30));
+                if db.exists() {
+                    if let Ok(repo) = SqliteRepository::open(&db).await {
+                        if let Ok(cfg) = repo.load_config().await {
+                            if cfg.servers.iter().any(|s| s.id == "fresh") {
+                                break;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        // 2) 造一个 exported_at 更旧的 config.json（2020）
+        let json = r#"{
+            "servers": [{"id":"stale","name":"Stale","port":3000,"protocol":"websocket"}],
+            "events": [],
+            "mockServices": [],
+            "scenes": [],
+            "systemSettings": {"id":"system"},
+            "windowConfig": {},
+            "version": "2.0.0",
+            "exportedAt": "2020-01-01T00:00:00Z"
+        }"#;
+        std::fs::write(dir.join("config.json"), json).unwrap();
+        // 3) 再次 sqlite 模式 init：JSON 比 SQLite 旧 → 不覆盖
+        let cm = ConfigManager::with_mode(dir.clone(), "sqlite");
+        cm.init();
+        let loaded = cm.get_servers();
+        assert_eq!(loaded.len(), 1, "不应被旧 JSON 覆盖（无数据丢失）");
+        assert_eq!(loaded[0].id, "fresh");
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    /// json 模式：纯 JSON，不创建 SQLite（完全回退旧行为）
     #[test]
     fn json_mode_has_no_sqlite_mirror() {
         let dir = tmp_config_dir();
