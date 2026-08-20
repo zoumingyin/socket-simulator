@@ -6,7 +6,7 @@
 //! 不持久化配置（ConfigManager 已持久化），仅持有运行时句柄。
 
 use std::collections::HashMap;
-use std::sync::{Arc, Mutex};
+use std::sync::Mutex;
 
 use axum::extract::Request;
 use axum::response::Response;
@@ -23,7 +23,8 @@ use super::server::{dispatch, MockServer};
 struct RunningHandle {
     /// 自定义端口的关闭 signal
     shutdown: Option<oneshot::Sender<()>>,
-    /// 实际绑定端口
+    /// 实际绑定端口（由 `port_of` 查询读取；该查询当前仅测试消费）
+    #[allow(dead_code)]
     port: u16,
 }
 
@@ -286,7 +287,8 @@ impl MockManager {
         }
     }
 
-    /// 查询实际绑定端口
+    /// 查询实际绑定端口（当前仅测试消费；管理面查询端口待接线）
+    #[allow(dead_code)]
     pub fn port_of(&self, id: &str) -> Option<u16> {
         self.handles.lock().unwrap().get(id).map(|h| h.port)
     }
@@ -310,13 +312,12 @@ impl MockManager {
         }
     }
 
-    /// 当前运行中的服务 ID 列表
+    /// 当前运行中的服务 ID 列表（当前仅测试消费；管理面展示待接线）
+    #[allow(dead_code)]
     pub fn running_ids(&self) -> Vec<String> {
         self.handles.lock().unwrap().keys().cloned().collect()
     }
 }
-
-pub type SharedMockManager = Arc<MockManager>;
 
 #[cfg(test)]
 mod tests {

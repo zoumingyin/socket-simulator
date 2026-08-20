@@ -6,6 +6,10 @@
 //! 实际接收量。产出结构化 `BenchReport`（连接数、吞吐 msg/s、RTT p50/p95/p99、错误数）。
 //!
 //! 运行（可读报告）：`cargo run --bin benchmark`（见 `src/bin/benchmark.rs`）。
+//!
+//! 注：本模块全部 API 由 `benchmark` bin 与 `#[cfg(test)]` 测试消费，
+//! 主 bin 编译路径不调用（预留模块），故模块级 allow dead_code。
+#![allow(dead_code)]
 
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex, Weak};

@@ -21,15 +21,22 @@ use crate::backend::types::{ProtocolType, ServerConfig, SystemSettings};
 
 /// 协议适配器：在 `Transport` 基础上附加协议元信息。
 /// 实现方只需补齐元信息方法；生命周期与消息方法继承自 `Transport`。
+///
+/// 注：`protocol`/`server_id`/`is_unified` 当前仅由 `#[cfg(test)]` 断言消费
+/// （`reserved_kinds_are_registered` 等）；主 bin 仅经 `Transport` 方法驱动，
+/// 故方法级 allow dead_code（接口预留，供管理面/前端查询协议元信息）。
 #[async_trait]
 pub trait ProtocolAdapter: Transport {
     /// 适配器对应的协议（unified 返回其底层协议）
+    #[allow(dead_code)]
     fn protocol(&self) -> ProtocolType;
 
     /// 所属服务 ID
+    #[allow(dead_code)]
     fn server_id(&self) -> &str;
 
     /// 是否为统一路由适配器（共端口 Mock + Socket）
+    #[allow(dead_code)]
     fn is_unified(&self) -> bool {
         false
     }
@@ -169,7 +176,8 @@ impl AdapterRegistry {
         Some(f(cfg, sys, hooks))
     }
 
-    /// 已注册种类（调试 / 审计用）
+    /// 已注册种类（调试 / 审计用；当前由测试断言消费）
+    #[allow(dead_code)]
     pub fn kinds(&self) -> Vec<AdapterKind> {
         self.factories.lock().unwrap().keys().copied().collect()
     }

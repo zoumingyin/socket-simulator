@@ -52,6 +52,8 @@ impl ServiceManager {
     }
 
     /// 注入自定义适配器注册表（P2-4 预留协议在此挂载；默认内置四类）
+    /// 当前无调用方（new 内置默认注册表），预留注入点
+    #[allow(dead_code)]
     pub fn with_registry(mut self, registry: Arc<AdapterRegistry>) -> Self {
         self.registry = registry;
         self

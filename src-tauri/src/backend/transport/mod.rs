@@ -16,4 +16,3 @@ pub mod ws_connection;
 
 pub use adapter::{AdapterKind, AdapterRegistry, ProtocolAdapter};
 pub use transport::Transport;
-pub use hooks::TransportHooks;

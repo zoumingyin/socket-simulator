@@ -18,7 +18,7 @@
 //!   但通过浏览器直接访问 `http://localhost:3080/` 会得到嵌入的（可能过期的）页面
 
 use axum::body::Body;
-use axum::http::{header, HeaderMap, HeaderName, HeaderValue, Response, StatusCode};
+use axum::http::{header, HeaderMap, HeaderValue, Response, StatusCode};
 use axum::response::IntoResponse;
 use rust_embed::RustEmbed;
 

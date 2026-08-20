@@ -45,6 +45,8 @@ enum DbMsg {
         offset: i64,
         reply: std::sync::mpsc::Sender<(i64, Vec<LogEntry>)>,
     },
+    /// 预留：优雅关闭信号（当前 LogDb 线程随进程退出自然结束，未接线）
+    #[allow(dead_code)]
     Shutdown,
 }
 

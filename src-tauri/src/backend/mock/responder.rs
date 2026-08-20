@@ -81,10 +81,19 @@ pub fn json_error_response(status: StatusCode, error: &str, message: &str) -> Re
 }
 
 /// 响应延迟（Extension，由 handler 取出后 sleep）
+///
+/// ⚠️ 现状：`DelayMs` 被 `default_response`/`rule_response` 构造插入 `resp.extensions_mut()`，
+/// 但全 crate 无 `extensions().get::<DelayMs>()` 消费点——mock 响应延迟实际由
+/// `engine.rs` 的 `tokio::time::sleep` 路径生效，此 Extension 机制尚未接线
+/// （HTTP mock 直连 responder 的路径延迟未生效，潜在缺陷待评估）。
 #[derive(Clone, Copy)]
-pub struct DelayMs(pub u32);
+pub struct DelayMs(
+    #[allow(dead_code)] pub u32,
+);
 
 impl DelayMs {
+    /// 预留：延迟毫秒转 Duration（待消费点接线后使用）
+    #[allow(dead_code)]
     pub fn duration(self) -> Duration {
         Duration::from_millis(self.0 as u64)
     }

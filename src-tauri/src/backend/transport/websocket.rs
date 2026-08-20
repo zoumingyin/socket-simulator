@@ -17,7 +17,6 @@ use tokio_rustls::TlsAcceptor;
 use tokio_tungstenite::WebSocketStream;
 use tokio_tungstenite::accept_async;
 
-use crate::backend::constants::*;
 use crate::backend::error::BackendError;
 use crate::backend::net::bind::bind_with_release;
 use crate::backend::transport::hooks::TransportHooks;

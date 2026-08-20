@@ -7,9 +7,9 @@
 //! F-4 的 specta `generated.ts` 在 v3 迁移期保留作过渡，完成后退役。
 
 // 工具 bin：编译整个 backend 树但仅复用其中一部分（OpenAPI 导出），
-// dead_code 是预期视角，非真实缺陷（主 bin socket-service-manager 不受影响）
+// dead_code / unused_imports 是预期视角，非真实缺陷（主 bin socket-service-manager 不受影响）
 #[path = "../backend/mod.rs"]
-#[allow(dead_code)]
+#[allow(dead_code, unused_imports)]
 mod backend;
 
 fn main() {

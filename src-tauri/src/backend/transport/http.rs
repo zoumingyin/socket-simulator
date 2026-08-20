@@ -15,14 +15,12 @@ use std::net::SocketAddr;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 
-use axum::extract::connect_info::ConnectInfo;
 use axum::http::StatusCode;
 use axum::middleware::from_fn_with_state;
 use axum::response::{IntoResponse, Response};
 use axum::Router;
 use serde_json::Value;
-use tokio::net::TcpListener;
-use tokio::sync::{mpsc, Notify};
+use tokio::sync::Notify;
 
 use crate::backend::error::BackendError;
 use crate::backend::net::bind::bind_with_release;
