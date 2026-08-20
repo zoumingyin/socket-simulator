@@ -21,6 +21,7 @@ use axum::response::{IntoResponse, Response};
 use axum::Router;
 use serde_json::Value;
 use tokio::sync::Notify;
+use tower_http::cors::CorsLayer;
 
 use crate::backend::error::BackendError;
 use crate::backend::net::bind::bind_with_release;
@@ -96,6 +97,8 @@ impl HttpServer {
     }
 
     /// 构建路由（状态由调用方通过 `with_state` 注入；IP 过滤中间件在共享构建器内）
+    /// CORS：本地调试工具，HTTP 受管服务默认全开（与 Unified/Mock/SIO 传输一致），
+    /// 否则浏览器跨域访问受管 HTTP 服务被拦。
     fn build_router(&self) -> Router {
         // 选生效路由：用户配置优先，空则用默认
         let effective: Vec<HttpRouteConfig> = if self.cfg.http_routes.is_empty() {
@@ -114,6 +117,7 @@ impl HttpServer {
         };
         build_http_router(effective, state.clone())
             .layer(from_fn_with_state(state.clone(), ip_guard::<HttpAppState>))
+            .layer(CorsLayer::permissive())
             .with_state(state)
     }
 }
@@ -256,6 +260,40 @@ mod tests {
         assert_eq!(defaults[1].method, HttpMethod::Get);
         assert_eq!(defaults[1].path, "/stream");
         assert_eq!(defaults[1].route_type, HttpRouteType::Stream);
+    }
+
+    /// 回归：HTTP 受管服务响应必须带 CORS 头（浏览器跨域调试 mock/HTTP 服务）
+    #[tokio::test]
+    async fn http_router_sends_cors_headers() {
+        use tower::ServiceExt;
+
+        let cfg = ServerConfig {
+            id: "s1".to_string(),
+            protocol: ProtocolType::Http,
+            ..Default::default()
+        };
+        let hooks = TransportHooks {
+            on_connect: Arc::new(|_| {}),
+            on_message: Arc::new(|_, _, _| {}),
+            on_disconnect: Arc::new(|_| {}),
+        };
+        let server = HttpServer::new(cfg, SystemSettings::default(), hooks);
+        let router = server.build_router();
+        let resp = router
+            .oneshot(
+                axum::http::Request::builder()
+                    .method("POST")
+                    .uri("/hello")
+                    .body(axum::body::Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(
+            resp.headers().get("access-control-allow-origin"),
+            Some(&"*".parse().unwrap()),
+            "HTTP 受管服务应返回 Access-Control-Allow-Origin: *"
+        );
     }
 
     /// 自定义路由应正确去重同 (path, method) 并分组
