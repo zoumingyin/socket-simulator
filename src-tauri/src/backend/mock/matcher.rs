@@ -15,7 +15,12 @@ use crate::backend::types::{HttpMethod, MockMatchCondition, MockRule};
 /// 匹配结果
 #[derive(Debug, Clone)]
 pub struct MatchHit {
+    /// 预留：命中的规则 ID。当前调用方仅用 `is_some()` 判定命中与否，
+    /// 字段待 mock 审计 / 日志展示消费（届时移除 allow）
+    #[allow(dead_code)]
     pub rule_id: String,
+    /// 预留：路径参数（同上）
+    #[allow(dead_code)]
     pub path_params: Vec<(String, String)>,
 }
 

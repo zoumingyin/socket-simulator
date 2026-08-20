@@ -10,7 +10,10 @@
 //!   `Option<T>` 恒导出为 `T | null`（见 `src/lang/ts/export_config.rs`）。前端类型里
 //!   既有 `?` 也有 `| null` 的用法，生成产物以 `| null` 为准；前端消费时按此契约适配。
 
+// 工具 bin：编译整个 backend 树但仅复用其中一部分（类型导出），
+// dead_code 是预期视角，非真实缺陷（主 bin socket-service-manager 不受影响）
 #[path = "../backend/mod.rs"]
+#[allow(dead_code)]
 mod backend;
 
 use specta::ts::{export, BigIntExportBehavior, ExportConfiguration};

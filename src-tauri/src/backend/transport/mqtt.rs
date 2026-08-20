@@ -17,8 +17,12 @@ use crate::backend::types::{ProtocolType, ServerConfig, SystemSettings};
 
 /// 受管服务 MQTT 传输层骨架（尚未实现）
 pub struct MqttAdapter {
+    /// 预留字段：真实实现（broker 连接/topic 订阅/客户端注册表/hooks 调用）时使用
+    #[allow(dead_code)]
     cfg: ServerConfig,
+    #[allow(dead_code)]
     sys: SystemSettings,
+    #[allow(dead_code)]
     hooks: TransportHooks,
     running: Arc<AtomicBool>,
 }

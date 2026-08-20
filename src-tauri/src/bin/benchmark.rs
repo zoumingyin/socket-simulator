@@ -3,7 +3,10 @@
 //! 在进程内启动真实 `WsServer` 并以回显模式压测，输出可读报告。
 //! 可用环境变量覆盖默认规模：BENCH_CLIENTS / BENCH_MESSAGES / BENCH_PAYLOAD / BENCH_NO_ECHO=1。
 
+// 工具 bin：编译整个 backend 树但仅复用其中一部分（压测），
+// dead_code 是预期视角，非真实缺陷（主 bin socket-service-manager 不受影响）
 #[path = "../backend/mod.rs"]
+#[allow(dead_code)]
 mod backend;
 
 fn main() {

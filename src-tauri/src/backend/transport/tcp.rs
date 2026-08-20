@@ -17,8 +17,12 @@ use crate::backend::types::{ProtocolType, ServerConfig, SystemSettings};
 
 /// 受管服务 TCP 传输层骨架（尚未实现）
 pub struct TcpAdapter {
+    /// 预留字段：真实实现（绑定监听/accept loop/分帧/客户端注册表/hooks 调用）时使用
+    #[allow(dead_code)]
     cfg: ServerConfig,
+    #[allow(dead_code)]
     sys: SystemSettings,
+    #[allow(dead_code)]
     hooks: TransportHooks,
     running: Arc<AtomicBool>,
 }
