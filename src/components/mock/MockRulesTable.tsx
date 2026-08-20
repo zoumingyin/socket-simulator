@@ -46,6 +46,12 @@ export function MockRulesTable({
     messageApi.success(`已删除 ${ids.size} 条规则`);
   };
 
+  const handleDeleteAll = async () => {
+    await onUpdate([]);
+    setSelectedKeys([]);
+    messageApi.success('已删除全部规则');
+  };
+
   const handleToggle = async (rule: MockRule, enabled: boolean) => {
     await onUpdate(rules.map((r) => (r.id === rule.id ? { ...r, enabled } : r)));
   };
@@ -159,6 +165,18 @@ export function MockRulesTable({
             批量删除{selectedKeys.length > 0 ? ` (${selectedKeys.length})` : ''}
           </Button>
         </Popconfirm>
+        {rules.length > 0 && (
+          <Popconfirm
+            title={`确认删除全部 ${rules.length} 条规则？此操作不可撤销`}
+            okText="全部删除"
+            okButtonProps={{ danger: true }}
+            onConfirm={handleDeleteAll}
+          >
+            <Button danger type="text" icon={<DeleteOutlined />} style={{ marginLeft: 'auto' }}>
+              删除全部
+            </Button>
+          </Popconfirm>
+        )}
       </div>
       {rules.length === 0 ? (
         <Table
