@@ -2,9 +2,14 @@
 name = "socket-service-manager"
 version = "3.0.0"
 edition = "2021"
-description = "Socket 服务管理平台"
+description = "NexHub Studio — 多协议服务管理平台"
 # 多 bin（benchmark / export_openapi / export_types）下 `cargo run` 默认运行主应用
-default-run = "socket-service-manager"
+default-run = "nexhub-studio"
+
+# 主应用 bin：品牌产物名 nexhub-studio.exe（package name 保持兼容内部引用）
+[[bin]]
+name = "nexhub-studio"
+path = "src/main.rs"
 
 [lib]
 # 与 bin `socket-service-manager` 区分：rustc 将 bin 的 Windows PDB 调试符号

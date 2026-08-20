@@ -208,7 +208,7 @@ npx tauri build      # beforeBuildCommand 自动 tsc && vite build，输出 NSIS
 
 ```bash
 # Rust 后端测试（含 Mock 引擎、传输层、存储、WS 冒烟）
-cd src-tauri && cargo test --bin socket-service-manager   # 96 passed
+cd src-tauri && cargo test --bin nexhub-studio   # 96 passed
 # 前端类型检查
 npx tsc --noEmit                                          # 0 errors
 ```
