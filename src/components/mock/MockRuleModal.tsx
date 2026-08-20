@@ -1,12 +1,24 @@
 import { useEffect, useState } from 'react';
-import { Form, Input, InputNumber, Select, Switch, Modal, Collapse, message } from 'antd';
+import { Form, Input, InputNumber, Select, Switch, Modal, Collapse, Space, Button, message } from 'antd';
+import { DeleteOutlined } from '@ant-design/icons';
 import { JsonEditor } from './JsonEditor.js';
 import { ConditionEditor } from './ConditionEditor.js';
 import { MOCK_METHODS } from './constants.js';
 import { StatusCodeSelect } from './StatusCodeSelect.js';
+import { emptyParam, parseBodyToParams, paramsToBody } from './responseParams.js';
+import type { RespParam, RespType } from './responseParams.js';
 import type { MockRule } from '../../types/index.js';
 
 const { Option } = Select;
+
+const RESP_TYPE_OPTIONS: Array<{ value: RespType; label: string }> = [
+  { value: 'string', label: 'string' },
+  { value: 'number', label: 'number' },
+  { value: 'boolean', label: 'boolean' },
+  { value: 'object', label: 'object {}' },
+  { value: 'array', label: 'array []' },
+  { value: 'null', label: 'null' },
+];
 
 export function MockRuleModal({
   open,
@@ -22,6 +34,8 @@ export function MockRuleModal({
   const [form] = Form.useForm();
   const [saving, setSaving] = useState(false);
   const [advancedKeys, setAdvancedKeys] = useState<string[]>([]);
+  const [respKeys, setRespKeys] = useState<string[]>([]);
+  const [params, setParams] = useState<RespParam[]>([]);
 
   useEffect(() => {
     if (open) {
@@ -70,6 +84,29 @@ export function MockRuleModal({
       setSaving(false);
       if ((e as Error).message) message.error((e as Error).message);
     }
+  };
+
+  // ---- 响应参数 ↔ 响应体 双向转换 ----
+  const updateParam = (i: number, patch: Partial<RespParam>) =>
+    setParams((prev) => prev.map((p, idx) => (idx === i ? { ...p, ...patch } : p)));
+  const removeParam = (i: number) =>
+    setParams((prev) => prev.filter((_, idx) => idx !== i));
+
+  const handleParseParams = () => {
+    const body = form.getFieldValue('responseBody');
+    const list = parseBodyToParams(typeof body === 'string' ? body : '');
+    if (list.length === 0) {
+      message.warning('响应体不是合法 JSON，无法解析');
+      return;
+    }
+    setParams(list);
+    message.success(`已从响应体解析 ${list.length} 个参数`);
+  };
+
+  const handleGenBody = () => {
+    const json = paramsToBody(params);
+    form.setFieldValue('responseBody', json);
+    message.success('响应体已按参数生成');
   };
 
   return (
@@ -123,6 +160,58 @@ export function MockRuleModal({
         <Form.Item name="responseBody" label="响应体" rules={[{ required: true }]} style={{ marginBottom: 4 }}>
           <JsonEditor rows={3} />
         </Form.Item>
+
+        <Collapse
+          ghost
+          size="small"
+          activeKey={respKeys}
+          onChange={(keys) => setRespKeys(keys as string[])}
+          style={{ marginBottom: 8 }}
+          items={[{
+            key: 'respParams',
+            label: '响应参数生成（可选）',
+            children: (
+              <div>
+                <Space size={8} style={{ marginBottom: 8 }} wrap>
+                  <Button size="small" onClick={handleParseParams}>从响应体解析</Button>
+                  <Button size="small" type="primary" onClick={handleGenBody}>生成响应体</Button>
+                  <Button size="small" type="dashed" onClick={() => setParams([...params, emptyParam()])}>
+                    添加参数
+                  </Button>
+                </Space>
+                {params.length === 0 ? (
+                  <div style={{ fontSize: 12, color: '#888' }}>
+                    声明响应字段后点击「生成响应体」；也可先写好响应体再点「从响应体解析」编辑。
+                  </div>
+                ) : (
+                  params.map((p, i) => (
+                    <Space key={i} style={{ width: '100%', marginBottom: 6 }} align="baseline">
+                      <Input
+                        placeholder="字段名（a.b 为嵌套）"
+                        value={p.key}
+                        onChange={(e) => updateParam(i, { key: e.target.value })}
+                        style={{ width: 150 }}
+                      />
+                      <Select
+                        value={p.type}
+                        onChange={(v) => updateParam(i, { type: v as RespType })}
+                        style={{ width: 104 }}
+                        options={RESP_TYPE_OPTIONS}
+                      />
+                      <Input
+                        placeholder={p.type === 'array' ? 'JSON 数组，如 ["a","b"]' : '示例值'}
+                        value={p.value}
+                        onChange={(e) => updateParam(i, { value: e.target.value })}
+                        style={{ flex: 1, minWidth: 120 }}
+                      />
+                      <Button type="text" danger size="small" icon={<DeleteOutlined />} onClick={() => removeParam(i)} />
+                    </Space>
+                  ))
+                )}
+              </div>
+            ),
+          }]}
+        />
 
         <Collapse
           ghost
