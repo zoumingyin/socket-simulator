@@ -116,7 +116,9 @@ function AppLayout(): React.ReactElement {
           className={isDark ? "tech-shell-sider" : undefined}
           style={{
             height: "100vh",
-            overflow: "auto",
+            overflow: "hidden",
+            display: "flex",
+            flexDirection: "column",
             background: isDark ? undefined : "#f2f8f5",
           }}
         >
@@ -124,6 +126,7 @@ function AppLayout(): React.ReactElement {
             className={isDark ? "tech-shell-brand" : undefined}
             style={{
               height: 44,
+              flexShrink: 0,
               display: "flex",
               alignItems: "center",
               justifyContent: "space-between",
@@ -156,9 +159,10 @@ function AppLayout(): React.ReactElement {
             selectedKeys={[location.pathname]}
             items={menuItems}
             style={{
-              height: "calc(100vh - 44px)",
+              flex: 1,
+              minHeight: 0,
+              overflow: "hidden",
               borderRight: 0,
-              overflow: "auto",
               background: "transparent",
             }}
             onClick={({ key }) => navigate(key)}
@@ -166,8 +170,8 @@ function AppLayout(): React.ReactElement {
           {/* 版本信息（vite 构建时从 package.json 注入） */}
           <div
             style={{
-              marginTop: 12,
-              paddingBottom: 10,
+              flexShrink: 0,
+              padding: "10px 0",
               textAlign: "center",
               fontSize: 11,
               color: isDark ? "#5b6b85" : "#9aa8b5",
