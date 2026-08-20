@@ -163,6 +163,19 @@ function AppLayout(): React.ReactElement {
             }}
             onClick={({ key }) => navigate(key)}
           />
+          {/* 版本信息（vite 构建时从 package.json 注入） */}
+          <div
+            style={{
+              marginTop: 12,
+              paddingBottom: 10,
+              textAlign: "center",
+              fontSize: 11,
+              color: isDark ? "#5b6b85" : "#9aa8b5",
+              userSelect: "none",
+            }}
+          >
+            v{__APP_VERSION__}
+          </div>
         </Layout.Sider>
         <Layout
           style={{
