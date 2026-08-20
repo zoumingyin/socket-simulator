@@ -1,6 +1,6 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import type { Key } from 'react';
-import { Button, Table, Tag, Space, Popconfirm, message, Switch, Typography } from 'antd';
+import { Button, Table, Tag, Space, Popconfirm, message, Switch, Typography, Collapse } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
 import { EditOutlined, DeleteOutlined, PlusOutlined, FolderOutlined } from '@ant-design/icons';
 import type { MockRule, HttpMethod } from '../../types/index.js';
@@ -78,6 +78,17 @@ export function MockRulesTable({
     return { groups, none };
   }, [rules]);
 
+  /** 折叠面板展开态：默认全部展开；新增分组自动加入展开 */
+  const [openKeys, setOpenKeys] = useState<string[]>([]);
+  useEffect(() => {
+    setOpenKeys((prev) => {
+      const merged = new Set(prev);
+      grouped.groups.forEach((g) => merged.add(g.group));
+      if (grouped.none.length > 0) merged.add('未分组');
+      return Array.from(merged);
+    });
+  }, [grouped]);
+
   const columns: ColumnsType<MockRule> = [
     { title: '方法', dataIndex: 'method', key: 'method', width: 72, render: (v: HttpMethod) => <Tag color="blue" style={{ margin: 0 }}>{v}</Tag> },
     { title: '路径', dataIndex: 'pathPattern', key: 'pathPattern', ellipsis: true },
@@ -107,13 +118,17 @@ export function MockRulesTable({
     },
   ];
 
-  const renderGroup = (title: string, list: MockRule[]) => (
-    <div key={title} style={{ marginBottom: 8 }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 6, margin: '8px 0 6px' }}>
+  /** 生成折叠面板项（可折叠分组） */
+  const renderPanel = (title: string, list: MockRule[]) => ({
+    key: title,
+    label: (
+      <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
         <FolderOutlined style={{ fontSize: 12, opacity: 0.6 }} />
         <Text strong style={{ fontSize: 12 }}>{title}</Text>
         <Text type="secondary" style={{ fontSize: 11 }}>{list.length} 条</Text>
-      </div>
+      </span>
+    ),
+    children: (
       <Table
         rowKey="id"
         columns={columns}
@@ -124,8 +139,8 @@ export function MockRulesTable({
         tableLayout="fixed"
         style={{ width: '100%' }}
       />
-    </div>
-  );
+    ),
+  });
 
   return (
     <div style={{ width: '100%', maxWidth: '100%', minWidth: 0, overflow: 'hidden' }}>
@@ -157,10 +172,16 @@ export function MockRulesTable({
           locale={{ emptyText: '暂无规则，点击上方新增' }}
         />
       ) : (
-        <>
-          {grouped.groups.map((g) => renderGroup(g.group, g.list))}
-          {grouped.none.length > 0 && renderGroup('未分组', grouped.none)}
-        </>
+        <Collapse
+          ghost
+          size="small"
+          activeKey={openKeys}
+          onChange={(keys) => setOpenKeys(keys as string[])}
+          items={[
+            ...grouped.groups.map((g) => renderPanel(g.group, g.list)),
+            ...(grouped.none.length > 0 ? [renderPanel('未分组', grouped.none)] : []),
+          ]}
+        />
       )}
       <MockRuleModal open={modalOpen} editing={editing} onOk={handleOk} onCancel={() => setModalOpen(false)} />
     </div>
