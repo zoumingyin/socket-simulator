@@ -225,7 +225,8 @@ export function schemaToExample(
         case 'date': return '2026-01-01';
         case 'uuid': return '00000000-0000-0000-0000-000000000000';
         case 'email': return 'user@example.com';
-        default: return 'string';
+        // 无格式约束且无 example/default/enum → 默认空字符串（不输出 "string" 占位符）
+        default: return '';
       }
     }
     case 'number':
