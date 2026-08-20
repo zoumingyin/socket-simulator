@@ -171,8 +171,8 @@ function AppLayout(): React.ReactElement {
           <div
             style={{
               flexShrink: 0,
-              padding: "10px 0",
-              textAlign: "center",
+              padding: "10px 0 10px 12px",
+              textAlign: "left",
               fontSize: 11,
               color: isDark ? "#5b6b85" : "#9aa8b5",
               userSelect: "none",
