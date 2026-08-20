@@ -1,6 +1,0 @@
-# 仅保留最终选定 W1x-a（青绿底白闪电）源文件，其余设计候选与临时资产不入库
-*.svg
-*.png
-*.html
-!logo-w1x-a-bolt.svg
-!logo-w1x-a-bolt.png

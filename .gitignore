@@ -59,3 +59,8 @@ logs/
 # Tauri
 src-tauri/gen/
 .workbuddy
+design
+docs
+# 设计资产与计划文档（不入库）
+design/
+docs/
