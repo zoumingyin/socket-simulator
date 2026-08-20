@@ -860,6 +860,8 @@ export interface components {
         MockRule: {
             description?: string | null;
             enabled?: boolean;
+            /** @description 分组（从 Swagger 导入时的 OpenAPI tags；仅前端分组展示用，不影响匹配） */
+            group?: string | null;
             id?: string;
             /** @description 请求体匹配（包含子串；空表示不匹配 body） */
             matchBody?: string | null;

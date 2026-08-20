@@ -55,6 +55,7 @@ interface OperationLike {
   operationId?: unknown;
   summary?: unknown;
   responses?: unknown;
+  tags?: unknown;
 }
 
 function operationToRule(method: HttpMethod, path: string, op: OperationLike): MockRule {
@@ -65,6 +66,11 @@ function operationToRule(method: HttpMethod, path: string, op: OperationLike): M
     (typeof op.operationId === 'string' && op.operationId) ||
     summary ||
     `${method} ${path}`;
+  // 分组：OpenAPI tags（Swagger UI 的接口分组）；多 tag 取首个
+  const group =
+    Array.isArray(op.tags) && (op.tags as unknown[]).length > 0
+      ? String((op.tags as unknown[])[0])
+      : undefined;
   return {
     id: `rule_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`,
     name,
@@ -77,6 +83,7 @@ function operationToRule(method: HttpMethod, path: string, op: OperationLike): M
     matchHeaders: [],
     matchQuery: [],
     responseHeaders: [],
+    group,
   };
 }
 

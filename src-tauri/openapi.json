@@ -486,6 +486,13 @@
           "enabled": {
             "type": "boolean"
           },
+          "group": {
+            "description": "分组（从 Swagger 导入时的 OpenAPI tags；仅前端分组展示用，不影响匹配）",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
           "id": {
             "type": "string"
           },

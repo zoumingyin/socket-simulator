@@ -61,6 +61,7 @@ export function MockRuleModal({
         ...vals,
         matchBody: vals.matchBody || undefined,
         description: vals.description || undefined,
+        group: vals.group ? String(vals.group).trim() : undefined,
       };
       setSaving(true);
       await onOk(rule);
@@ -144,6 +145,9 @@ export function MockRuleModal({
                 </Form.Item>
                 <Form.Item name="description" label="描述" style={{ marginBottom: 8 }}>
                   <Input placeholder="可选" />
+                </Form.Item>
+                <Form.Item name="group" label="分组" tooltip="用于规则分组展示（从 Swagger 导入时取 OpenAPI tags）" style={{ marginBottom: 0, gridColumn: '1 / -1' }}>
+                  <Input placeholder="可选，如：用户管理" />
                 </Form.Item>
                 <Form.Item name="responseHeaders" label="响应头" style={{ marginBottom: 0, gridColumn: '1 / -1' }}>
                   <ConditionEditor valueIsHeaderValue />

@@ -1,9 +1,11 @@
-import { useState } from 'react';
-import { Button, Table, Tag, Space, Popconfirm, message, Switch } from 'antd';
+import { useMemo, useState } from 'react';
+import { Button, Table, Tag, Space, Popconfirm, message, Switch, Typography } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
-import { EditOutlined, DeleteOutlined, PlusOutlined } from '@ant-design/icons';
+import { EditOutlined, DeleteOutlined, PlusOutlined, FolderOutlined } from '@ant-design/icons';
 import type { MockRule, HttpMethod } from '../../types/index.js';
 import { MockRuleModal } from './MockRuleModal.js';
+
+const { Text } = Typography;
 
 export function MockRulesTable({
   rules,
@@ -38,6 +40,28 @@ export function MockRulesTable({
     await onUpdate(rules.map((r) => (r.id === rule.id ? { ...r, enabled } : r)));
   };
 
+  /** 按 group（Swagger tags）分组：有分组按组排列，无分组归「未分组」放最后 */
+  const grouped = useMemo(() => {
+    const groups: Array<{ group: string; list: MockRule[] }> = [];
+    const none: MockRule[] = [];
+    const idx = new Map<string, number>();
+    for (const r of rules) {
+      const g = (r.group ?? '').trim();
+      if (!g) {
+        none.push(r);
+        continue;
+      }
+      const i = idx.get(g);
+      if (i === undefined) {
+        idx.set(g, groups.length);
+        groups.push({ group: g, list: [r] });
+      } else {
+        groups[i].list.push(r);
+      }
+    }
+    return { groups, none };
+  }, [rules]);
+
   const columns: ColumnsType<MockRule> = [
     { title: '方法', dataIndex: 'method', key: 'method', width: 72, render: (v: HttpMethod) => <Tag color="blue" style={{ margin: 0 }}>{v}</Tag> },
     { title: '路径', dataIndex: 'pathPattern', key: 'pathPattern', ellipsis: true },
@@ -67,21 +91,47 @@ export function MockRulesTable({
     },
   ];
 
+  const renderGroup = (title: string, list: MockRule[]) => (
+    <div key={title} style={{ marginBottom: 8 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 6, margin: '8px 0 6px' }}>
+        <FolderOutlined style={{ fontSize: 12, opacity: 0.6 }} />
+        <Text strong style={{ fontSize: 12 }}>{title}</Text>
+        <Text type="secondary" style={{ fontSize: 11 }}>{list.length} 条</Text>
+      </div>
+      <Table
+        rowKey="id"
+        columns={columns}
+        dataSource={list}
+        pagination={list.length > 8 ? { pageSize: 8, size: 'small' } : false}
+        size="small"
+        tableLayout="fixed"
+        style={{ width: '100%' }}
+      />
+    </div>
+  );
+
   return (
     <div style={{ width: '100%', maxWidth: '100%', minWidth: 0, overflow: 'hidden' }}>
       <div style={{ marginBottom: 10 }}>
         <Button type="primary" icon={<PlusOutlined />} onClick={openNew}>新增规则</Button>
       </div>
-      <Table
-        rowKey="id"
-        columns={columns}
-        dataSource={rules}
-        pagination={rules.length > 8 ? { pageSize: 8, size: 'small' } : false}
-        size="small"
-        tableLayout="fixed"
-        style={{ width: '100%' }}
-        locale={{ emptyText: '暂无规则，点击上方新增' }}
-      />
+      {rules.length === 0 ? (
+        <Table
+          rowKey="id"
+          columns={columns}
+          dataSource={[]}
+          pagination={false}
+          size="small"
+          tableLayout="fixed"
+          style={{ width: '100%' }}
+          locale={{ emptyText: '暂无规则，点击上方新增' }}
+        />
+      ) : (
+        <>
+          {grouped.groups.map((g) => renderGroup(g.group, g.list))}
+          {grouped.none.length > 0 && renderGroup('未分组', grouped.none)}
+        </>
+      )}
       <MockRuleModal open={modalOpen} editing={editing} onOk={handleOk} onCancel={() => setModalOpen(false)} />
     </div>
   );

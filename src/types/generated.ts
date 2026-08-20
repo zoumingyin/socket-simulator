@@ -36,7 +36,7 @@ export type HttpRouteConfig = { id?: string; method?: HttpMethod; path?: string;
 export type MockMatchCondition = { key?: string; value?: string; matchKind?: string; enabled?: boolean }/**
  * Mock 模拟规则
  */
-export type MockRule = { id?: string; name?: string; method?: HttpMethod; pathPattern?: string; matchHeaders?: MockMatchCondition[]; matchQuery?: MockMatchCondition[]; matchBody?: string | null; responseStatusCode?: number; responseHeaders?: MockMatchCondition[]; responseBody?: string; responseDelayMs?: number; enabled?: boolean; description?: string | null }/**
+export type MockRule = { id?: string; name?: string; method?: HttpMethod; pathPattern?: string; matchHeaders?: MockMatchCondition[]; matchQuery?: MockMatchCondition[]; matchBody?: string | null; responseStatusCode?: number; responseHeaders?: MockMatchCondition[]; responseBody?: string; responseDelayMs?: number; enabled?: boolean; description?: string | null; group?: string | null }/**
  * Mock 服务配置
  */
 export type MockServiceConfig = { id?: string; name?: string; description?: string; basePath?: string; customPort?: number | null; defaultStatusCode?: number; defaultResponseBody?: string; defaultDelayMs?: number; enabled?: boolean; rules?: MockRule[]; createdAt?: string; updatedAt?: string }/**

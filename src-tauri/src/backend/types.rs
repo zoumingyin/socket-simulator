@@ -190,6 +190,9 @@ pub struct MockRule {
     pub enabled: bool,
     #[serde(default)]
     pub description: Option<String>,
+    /// 分组（从 Swagger 导入时的 OpenAPI tags；仅前端分组展示用，不影响匹配）
+    #[serde(default)]
+    pub group: Option<String>,
 }
 
 /// Mock 服务配置

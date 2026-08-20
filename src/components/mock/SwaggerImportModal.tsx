@@ -85,6 +85,13 @@ export function SwaggerImportModal({
       render: (m: string) => <Tag color={METHOD_COLOR[m] ?? 'default'}>{m}</Tag>,
     },
     { title: '路径', dataIndex: 'pathPattern', ellipsis: true },
+    {
+      title: '分组',
+      dataIndex: 'group',
+      width: 110,
+      ellipsis: true,
+      render: (g?: string) => (g ? <Tag>{g}</Tag> : <Text type="secondary" style={{ fontSize: 12 }}>-</Text>),
+    },
     { title: '状态码', dataIndex: 'responseStatusCode', width: 80 },
     { title: '规则名', dataIndex: 'name', ellipsis: true },
   ];
