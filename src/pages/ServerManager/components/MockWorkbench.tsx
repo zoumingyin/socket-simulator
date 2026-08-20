@@ -2,10 +2,12 @@ import React, { useEffect, useState } from 'react';
 import {
   Button, Form, Input, InputNumber, Select, Switch, Space, Tag, Typography, theme,
 } from 'antd';
-import { DeleteOutlined } from '@ant-design/icons';
+import { DeleteOutlined, FileTextOutlined } from '@ant-design/icons';
 import type { MessageInstance } from 'antd/es/message/interface';
 import type { HttpMethod, MockRule, ServerConfig } from '../../../types/index.js';
 import { JsonEditor, MockRulesTable, TEST_METHODS } from '../../../components/MockComponents.js';
+import { StatusCodeSelect } from '../../../components/mock/StatusCodeSelect.js';
+import { SwaggerImportModal } from '../../../components/mock/SwaggerImportModal.js';
 
 const { Text, Title } = Typography;
 const { TextArea } = Input;
@@ -35,6 +37,7 @@ export function MockWorkbench({
 }): React.ReactElement | null {
   const { token } = theme.useToken();
   const [form] = Form.useForm();
+  const [swaggerOpen, setSwaggerOpen] = useState(false);
   const mockEnabled = Form.useWatch('mockEnabled', form);
   const rules = server.mockRules ?? [];
   const enabledCount = rules.filter((r) => r.enabled).length;
@@ -169,7 +172,7 @@ export function MockWorkbench({
               <Title level={5} style={{ margin: '0 0 10px', fontSize: 13, fontWeight: 600 }}>默认响应</Title>
               <Text type="secondary" style={{ fontSize: 12, display: 'block', marginBottom: 10 }}>未命中任何规则时返回</Text>
               <Form.Item name="mockDefaultStatusCode" label="状态码" rules={[{ required: true }]} style={{ marginBottom: 8 }}>
-                <InputNumber min={100} max={599} style={{ width: '100%' }} />
+                <StatusCodeSelect allowCustom style={{ width: '100%' }} />
               </Form.Item>
               <Form.Item name="mockDefaultDelayMs" label="延迟 (ms)" style={{ marginBottom: 0 }}>
                 <InputNumber min={0} max={60000} style={{ width: '100%' }} />
@@ -190,16 +193,29 @@ export function MockWorkbench({
           <div
             style={{
               display: 'flex',
-              alignItems: 'baseline',
+              alignItems: 'center',
               justifyContent: 'space-between',
               gap: 8,
               marginBottom: 4,
+              flexWrap: 'wrap',
             }}
           >
-            <Title level={5} style={{ margin: 0, fontSize: 13, fontWeight: 600 }}>匹配规则</Title>
-            <Text type="secondary" style={{ fontSize: 12 }}>按顺序匹配，首个命中生效</Text>
+            <Space size={8} align="baseline">
+              <Title level={5} style={{ margin: 0, fontSize: 13, fontWeight: 600 }}>匹配规则</Title>
+              <Text type="secondary" style={{ fontSize: 12 }}>按顺序匹配，首个命中生效</Text>
+            </Space>
+            <Button size="small" icon={<FileTextOutlined />} onClick={() => setSwaggerOpen(true)}>
+              导入 Swagger
+            </Button>
           </div>
           <MockRulesTable rules={rules} onUpdate={onUpdateRules} messageApi={messageApi} />
+          <SwaggerImportModal
+            open={swaggerOpen}
+            onCancel={() => setSwaggerOpen(false)}
+            onImport={async (imported) => {
+              await onUpdateRules([...rules, ...imported]);
+            }}
+          />
         </div>
       ) : (
         <div style={{ ...panelStyle, textAlign: 'center', padding: '28px 16px' }}>
