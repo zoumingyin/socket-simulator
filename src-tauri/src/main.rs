@@ -55,16 +55,16 @@ fn setup_tray(app: &tauri::App) -> tauri::Result<()> {
     let app_handle = app.handle().clone();
     let tray_menu = create_tray_menu(&app_handle)?;
 
-    let icon_paths = vec![
-        "icons/icon.png",
-        "../icons/icon.png",
-        "../../src-tauri/icons/icon.png",
-    ];
+    // 托盘/窗口图标：编译期嵌入（include_bytes!），避免安装版运行时
+    // 相对路径（icons/icon.png）不存在导致任务栏/托盘图标空白
+    let tray_icon = Image::from_bytes(include_bytes!("../icons/icon.png"))
+        .expect("托盘图标资源嵌入失败");
 
-    let mut builder = TrayIconBuilder::new()
+    let builder = TrayIconBuilder::new()
+        .icon(tray_icon)
         .menu(&tray_menu)
         .show_menu_on_left_click(true)
-        .tooltip("Socket 服务管理平台")
+        .tooltip("NexHub Studio")
         .on_menu_event(move |app, event| {
             match event.id().as_ref() {
                 MENU_SHOW => {
@@ -90,22 +90,6 @@ fn setup_tray(app: &tauri::App) -> tauri::Result<()> {
                 _ => {}
             }
         });
-
-    let mut icon_loaded = false;
-    for icon_path in &icon_paths {
-        match Image::from_path(icon_path) {
-            Ok(img) => {
-                builder = builder.icon(img);
-                icon_loaded = true;
-                break;
-            }
-            Err(_) => continue,
-        }
-    }
-
-    if !icon_loaded {
-        eprintln!("警告: 无法加载托盘图标");
-    }
 
     builder.build(app)?;
     Ok(())
@@ -134,6 +118,12 @@ fn main() {
             // （Tauri 2 的 generate_context 默认图标不一定会应用到窗口任务栏条目）
             if let Some(icon) = app.default_window_icon() {
                 let _ = window.set_icon(icon.clone());
+            } else {
+                // 兜底：编译期嵌入图标（与托盘一致，零运行时路径依赖）
+                let _ = window.set_icon(
+                    Image::from_bytes(include_bytes!("../icons/icon.png"))
+                        .expect("窗口图标资源嵌入失败"),
+                );
             }
 
             // ===== 启动 Rust 后端（先初始化，确保配置已从 SQLite 主读） =====

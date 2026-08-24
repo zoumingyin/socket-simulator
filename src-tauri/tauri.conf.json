@@ -19,7 +19,7 @@
     "windows": [
       {
         "label": "main",
-        "title": "Socket 服务管理平台",
+        "title": "NexHub Studio",
         "width": 1280,
         "height": 800,
         "resizable": true,
